@@ -39,8 +39,17 @@ import RefinementPanel from "./components/RefinementPanel";
 import CoWriterChat from "./components/CoWriterChat";
 
 export default function App() {
-  // Primary app state
-  const [story, setStory] = useState<Story>(INITIAL_STORY);
+  // Primary app state - lazy initialization from LocalStorage
+  const [story, setStory] = useState<Story>(() => {
+    try {
+      const saved = localStorage.getItem("ai_story_state");
+      return saved ? JSON.parse(saved) : INITIAL_STORY;
+    } catch (e) {
+      console.error("Failed to parse saved story state", e);
+      return INITIAL_STORY;
+    }
+  });
+
   const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "incubate" | "world" | "characters">("canvas");
   const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline">("structure");
   const [rightPanelTab, setRightPanelTab] = useState<"refine" | "chat" | "brainstorm">("refine");
@@ -58,10 +67,49 @@ export default function App() {
 
   const [notifications, setNotifications] = useState<string[]>([]);
 
-  // Focus mode & Collapsible sidebars state
+  // Focus mode & Collapsible sidebars state - lazy initialization from LocalStorage
   const [focusMode, setFocusMode] = useState(false);
-  const [isLeftOpen, setIsLeftOpen] = useState(true);
-  const [isRightOpen, setIsRightOpen] = useState(true);
+  const [isLeftOpen, setIsLeftOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ai_story_left_open");
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (e) {
+      return true;
+    }
+  });
+  const [isRightOpen, setIsRightOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ai_story_right_open");
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch (e) {
+      return true;
+    }
+  });
+
+  // Auto-Save effects for local storage persistence
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_story_state", JSON.stringify(story));
+    } catch (e) {
+      console.error("Failed to save story state to localStorage", e);
+    }
+  }, [story]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_story_left_open", JSON.stringify(isLeftOpen));
+    } catch (e) {
+      console.error("Failed to save isLeftOpen to localStorage", e);
+    }
+  }, [isLeftOpen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_story_right_open", JSON.stringify(isRightOpen));
+    } catch (e) {
+      console.error("Failed to save isRightOpen to localStorage", e);
+    }
+  }, [isRightOpen]);
 
   // Active Chapter resolution
   const activeChapterId = story.activeChapterId || (story.chapters[0]?.id) || "chapter-1";
