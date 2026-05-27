@@ -58,12 +58,18 @@ export default function App() {
 
   const [notifications, setNotifications] = useState<string[]>([]);
 
-  // Focus mode
+  // Focus mode & Collapsible sidebars state
   const [focusMode, setFocusMode] = useState(false);
+  const [isLeftOpen, setIsLeftOpen] = useState(true);
+  const [isRightOpen, setIsRightOpen] = useState(true);
 
-  // Sync state stats
-  const wordCount = story.manuscript ? story.manuscript.split(/\s+/).filter(Boolean).length : 0;
-  const charCount = story.manuscript ? story.manuscript.length : 0;
+  // Active Chapter resolution
+  const activeChapterId = story.activeChapterId || (story.chapters[0]?.id) || "chapter-1";
+  const activeCh = story.chapters.find((c) => c.id === activeChapterId) || story.chapters[0] || { id: "chapter-1", title: "Chapter 1", content: "" };
+
+  // Sync state stats based directly on the active chapter content
+  const wordCount = activeCh.content ? activeCh.content.split(/\s+/).filter(Boolean).length : 0;
+  const charCount = activeCh.content ? activeCh.content.length : 0;
   const readingTime = Math.ceil(wordCount / 220); // 220 words per minute average
 
   const showNotification = (message: string) => {
@@ -71,6 +77,96 @@ export default function App() {
     setTimeout(() => {
       setNotifications((prev) => prev.slice(0, -1));
     }, 4000);
+  };
+
+  // Keyboard short-cuts listener for sidebar drawer toggles & escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if user is pressing Ctrl (or Cmd on Mac)
+      const isMeta = e.ctrlKey || e.metaKey;
+
+      if (isMeta && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setIsLeftOpen((prev) => !prev);
+      }
+      
+      if (isMeta && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setIsRightOpen((prev) => !prev);
+      }
+
+      if (e.key === "Escape") {
+        setIsLeftOpen(false);
+        setIsRightOpen(false);
+        setFocusMode(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleTextChange = (newContent: string) => {
+    setStory((prev) => {
+      const nextChapters = prev.chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content: newContent } : ch
+      );
+      return {
+        ...prev,
+        manuscript: newContent,
+        chapters: nextChapters,
+        lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+    });
+  };
+
+  const handleSelectChapter = (chapterId: string) => {
+    setStory((prev) => {
+      const selectedCh = prev.chapters.find((ch) => ch.id === chapterId);
+      return {
+        ...prev,
+        activeChapterId: chapterId,
+        manuscript: selectedCh ? selectedCh.content : prev.manuscript,
+      };
+    });
+  };
+
+  const handleAddNewChapter = () => {
+    const nextIndex = story.chapters.length + 1;
+    const newCh = {
+      id: "chapter-" + Date.now(),
+      title: `Chapter ${nextIndex}: Untitled Chapter`,
+      content: "",
+    };
+    setStory((prev) => ({
+      ...prev,
+      chapters: [...prev.chapters, newCh],
+      activeChapterId: newCh.id,
+      manuscript: "",
+      lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    }));
+    showNotification(`Created Chapter ${nextIndex}`);
+  };
+
+  const handleDeleteChapter = (chapterId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (story.chapters.length <= 1) {
+      showNotification("You must keep at least one chapter.");
+      return;
+    }
+    setStory((prev) => {
+      const nextChapters = prev.chapters.filter((ch) => ch.id !== chapterId);
+      const nextActiveId = prev.activeChapterId === chapterId ? nextChapters[0].id : prev.activeChapterId;
+      const nextActiveCh = nextChapters.find(ch => ch.id === nextActiveId);
+      return {
+        ...prev,
+        chapters: nextChapters,
+        activeChapterId: nextActiveId,
+        manuscript: nextActiveCh ? nextActiveCh.content : "",
+        lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+    });
+    showNotification("Chapter deleted.");
   };
 
   // 1. Core integration: Adopt generated Story Starter
@@ -88,10 +184,18 @@ export default function App() {
       isCompleted: false,
     }));
 
+    const firstChapter = {
+      id: "chapter-1",
+      title: "Chapter 1: The Beginning",
+      content: beginning,
+    };
+
     setStory({
       ...story,
       title,
       manuscript: beginning,
+      chapters: [firstChapter],
+      activeChapterId: "chapter-1",
       summary: `A story generated about "${title}". Outline guide: ${outlineText.substring(0, 100)}...`,
       outline: parsedOutline.length > 0 ? parsedOutline : [
         { id: "out-start-1", title: "Act I: Overcoming the threshold", notes: outlineText, isCompleted: false }
@@ -112,7 +216,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          storyText: story.manuscript,
+          storyText: activeCh.content,
           genre: story.genre,
           tone: story.tone,
           instructions: expansionInstruction,
@@ -125,11 +229,18 @@ export default function App() {
 
       const data = await resp.json();
       if (data.text) {
-        setStory((prev) => ({
-          ...prev,
-          manuscript: prev.manuscript + "\n\n" + data.text,
-          lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        }));
+        const nextContent = activeCh.content + "\n\n" + data.text;
+        setStory((prev) => {
+          const nextChapters = prev.chapters.map((ch) =>
+            ch.id === activeChapterId ? { ...ch, content: nextContent } : ch
+          );
+          return {
+            ...prev,
+            manuscript: nextContent,
+            chapters: nextChapters,
+            lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          };
+        });
         showNotification("Writings expanded successfully!");
         setExpansionInstruction("");
       }
@@ -142,24 +253,28 @@ export default function App() {
 
   // 3. Core integration: Apply prose improvement
   const handleApplyRefine = (newProse: string) => {
-    if (highlightedText && story.manuscript.includes(highlightedText)) {
+    let nextContent = "";
+    if (highlightedText && activeCh.content.includes(highlightedText)) {
       // Replace only the specific subset highlighted
-      const nextManuscript = story.manuscript.replace(highlightedText, newProse);
-      setStory((p) => ({
-        ...p,
-        manuscript: nextManuscript,
-        lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }));
+      nextContent = activeCh.content.replace(highlightedText, newProse);
       showNotification("Surgically inserted improved prose.");
     } else {
       // Append it if selected highlights are cleared or not matching
-      setStory((p) => ({
-        ...p,
-        manuscript: p.manuscript + "\n\n" + newProse,
-        lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }));
+      nextContent = activeCh.content + "\n\n" + newProse;
       showNotification("Appended polished prose to the end.");
     }
+
+    setStory((prev) => {
+      const nextChapters = prev.chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content: nextContent } : ch
+      );
+      return {
+        ...prev,
+        manuscript: nextContent,
+        chapters: nextChapters,
+        lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+    });
     setHighlightedText("");
   };
 
@@ -195,10 +310,17 @@ export default function App() {
   // Helper action: Insert character snippet
   const handleInsertCharacterSnippet = (char: Character) => {
     const snippet = `\n\n[Character Introduction: ${char.name}, the ${char.archetype}. Physical features: ${char.physicalAppearance}. Quirk: ${char.quirksAndHabits}.]`;
-    setStory((prev) => ({
-      ...prev,
-      manuscript: prev.manuscript + snippet,
-    }));
+    const nextContent = activeCh.content + snippet;
+    setStory((prev) => {
+      const nextChapters = prev.chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content: nextContent } : ch
+      );
+      return {
+        ...prev,
+        manuscript: nextContent,
+        chapters: nextChapters,
+      };
+    });
     showNotification(`Introduced ${char.name} timeline.`);
     setSelectedMainTab("canvas");
   };
@@ -358,231 +480,300 @@ export default function App() {
         {/* VIEW 1: ACTIVE WRITING CANVAS */}
         {selectedMainTab === "canvas" && (
           <>
-            {/* Left Sidebar: Settings, Outlines, Beats */}
-            {!focusMode && (
-              <aside className="w-full lg:w-64 border-r border-[#e5e5df] bg-[#f9f9f5] flex flex-col p-4 shrink-0 overflow-y-auto">
-                {/* Story properties */}
-                <div className="mb-5 bg-white p-4 rounded-xl border border-[#efeee8] shadow-sm">
-                  <h4 className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#a1a19a] mb-3">
-                    Chronicle Meta
-                  </h4>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Title</label>
-                      <input
-                        type="text"
-                        value={story.title}
-                        onChange={(e) => setStory({ ...story, title: e.target.value })}
-                        className="w-full text-xs font-sans p-1.5 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none focus:border-[#5A5A40]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Synopsis</label>
-                      <textarea
-                        value={story.summary}
-                        onChange={(e) => setStory({ ...story, summary: e.target.value })}
-                        rows={2}
-                        className="w-full text-xs font-sans p-1.5 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none focus:border-[#5A5A40] leading-relaxed resize-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Genre</label>
-                        <select
-                          value={story.genre}
-                          onChange={(e) => setStory({ ...story, genre: e.target.value })}
-                          className="w-full text-[10px] font-sans p-1 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none"
+            {/* Left Sidebar: Chapters list, Settings, Outlines, Beats */}
+            <aside className={`h-full border-r border-[#e5e5df] bg-[#f9f9f5] flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ease-in-out ${isLeftOpen ? 'w-full lg:w-64 p-4' : 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden border-none'}`}>
+              
+              {/* Chapters List (Multi-Chapter Navigation) */}
+              <div className="mb-6 bg-white p-4 rounded-xl border border-[#efeee8] shadow-sm">
+                <div className="flex items-center justify-between mb-2.5 pb-1 border-b border-[#e5e5df]">
+                  <h3 className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#5A5A40]">
+                    Chapters
+                  </h3>
+                  <button
+                    onClick={handleAddNewChapter}
+                    className="p-1 text-[#5A5A40] hover:bg-[#efeee8] rounded transition-colors flex items-center justify-center cursor-pointer"
+                    title="Create New Chapter"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <ul className="space-y-1 max-h-48 overflow-y-auto">
+                  {story.chapters.map((ch) => (
+                    <li
+                      key={ch.id}
+                      onClick={() => handleSelectChapter(ch.id)}
+                      className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-xs font-sans transition-all duration-150 ${
+                        ch.id === activeChapterId
+                          ? "bg-[#5A5A40] text-white shadow-sm font-medium"
+                          : "text-[#555] hover:bg-[#efeee8] hover:text-[#111]"
+                      }`}
+                    >
+                      <span className="truncate flex-1">📝 {ch.title}</span>
+                      {story.chapters.length > 1 && (
+                        <button
+                          onClick={(e) => handleDeleteChapter(ch.id, e)}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 text-red-500 transition-opacity ml-1"
+                          title="Delete Chapter"
                         >
-                          {GENRES.map(g => (
-                            <option key={g} value={g}>{g}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Tone</label>
-                        <select
-                          value={story.tone}
-                          onChange={(e) => setStory({ ...story, tone: e.target.value })}
-                          className="w-full text-[10px] font-sans p-1 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none"
-                        >
-                          {TONES.map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      </div>
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <div className="text-[9px] text-[#88887e] italic text-center mt-2 font-mono">
+                  Ctrl + B to collapse
+                </div>
+              </div>
+
+              {/* Story properties */}
+              <div className="mb-5 bg-white p-4 rounded-xl border border-[#efeee8] shadow-sm">
+                <h4 className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#a1a19a] mb-3">
+                  Chronicle Meta
+                </h4>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={story.title}
+                      onChange={(e) => setStory({ ...story, title: e.target.value })}
+                      className="w-full text-xs font-sans p-1.5 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none focus:border-[#5A5A40]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Synopsis</label>
+                    <textarea
+                      value={story.summary}
+                      onChange={(e) => setStory({ ...story, summary: e.target.value })}
+                      rows={2}
+                      className="w-full text-xs font-sans p-1.5 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none focus:border-[#5A5A40] leading-relaxed resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Genre</label>
+                      <select
+                        value={story.genre}
+                        onChange={(e) => setStory({ ...story, genre: e.target.value })}
+                        className="w-full text-[10px] font-sans p-1 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none"
+                      >
+                        {GENRES.map(g => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-sans font-bold uppercase tracking-wider text-[#88887e] mb-1">Tone</label>
+                      <select
+                        value={story.tone}
+                        onChange={(e) => setStory({ ...story, tone: e.target.value })}
+                        className="w-full text-[10px] font-sans p-1 bg-[#fcfcf9] border border-[#d5d5cd] rounded text-[#33332d] focus:outline-none"
+                      >
+                        {TONES.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Left tab selectors */}
-                <div className="flex border-b border-[#e5e5df] mb-4">
-                  <button
-                    onClick={() => setLeftSidebarTab("structure")}
-                    className={`flex-1 pb-1.5 text-center font-sans text-[10px] uppercase font-bold tracking-wider cursor-pointer border-b ${
-                      leftSidebarTab === "structure" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
-                    }`}
-                  >
-                    Beats & Characters
-                  </button>
-                  <button
-                    onClick={() => setLeftSidebarTab("outline")}
-                    className={`flex-1 pb-1.5 text-center font-sans text-[10px] uppercase font-bold tracking-wider cursor-pointer border-b ${
-                      leftSidebarTab === "outline" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
-                    }`}
-                  >
-                    Narrative Acts ({story.outline.filter(o => !o.isCompleted).length})
-                  </button>
-                </div>
+              {/* Left tab selectors */}
+              <div className="flex border-b border-[#e5e5df] mb-4">
+                <button
+                  onClick={() => setLeftSidebarTab("structure")}
+                  className={`flex-1 pb-1.5 text-center font-sans text-[10px] uppercase font-bold tracking-wider cursor-pointer border-b ${
+                    leftSidebarTab === "structure" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
+                  }`}
+                >
+                  Beats & Cast
+                </button>
+                <button
+                  onClick={() => setLeftSidebarTab("outline")}
+                  className={`flex-1 pb-1.5 text-center font-sans text-[10px] uppercase font-bold tracking-wider cursor-pointer border-b ${
+                    leftSidebarTab === "outline" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
+                  }`}
+                >
+                  Acts ({story.outline.filter(o => !o.isCompleted).length})
+                </button>
+              </div>
 
-                {/* Left sidebar widgets */}
-                {leftSidebarTab === "structure" && (
-                  <div className="space-y-4">
-                    {/* Character Bible mini index */}
-                    <div className="bg-[#ecece4]/60 p-3.5 rounded-xl border border-[#dcdcd4]">
-                      <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider mb-2.5 text-[#5A5A40]">
-                        Cast references ({story.characters.length})
-                      </h4>
-                      {story.characters.length > 0 ? (
-                        <div className="space-y-2">
-                          {story.characters.map((char) => (
-                            <div
-                              key={char.id}
-                              onClick={() => handleInsertCharacterSnippet(char)}
-                              className="group flex items-center justify-between p-1 px-2 rounded bg-white hover:bg-[#5A5A40]/10 border border-[#efeee8] cursor-pointer transition-colors"
-                              title="Click to place character description into draft"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#a3b18a]" />
-                                <span className="text-xs text-[#33332d] group-hover:text-[#5A5A40] font-sans font-medium truncate max-w-[140px]">
-                                  {char.name}
-                                </span>
-                              </div>
-                              <span className="text-[8px] font-mono text-[#a1a19a] opacity-0 group-hover:opacity-100 transition-opacity">
-                                Introduces
+              {/* Left sidebar widgets */}
+              {leftSidebarTab === "structure" && (
+                <div className="space-y-4">
+                  {/* Character Bible mini index */}
+                  <div className="bg-[#ecece4]/60 p-3.5 rounded-xl border border-[#dcdcd4]">
+                    <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider mb-2.5 text-[#5A5A40]">
+                      Cast references ({story.characters.length})
+                    </h4>
+                    {story.characters.length > 0 ? (
+                      <div className="space-y-2">
+                        {story.characters.map((char) => (
+                          <div
+                            key={char.id}
+                            onClick={() => handleInsertCharacterSnippet(char)}
+                            className="group flex items-center justify-between p-1 px-2 rounded bg-white hover:bg-[#5A5A40]/10 border border-[#efeee8] cursor-pointer transition-colors"
+                            title="Click to place character description into draft"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#a3b18a]" />
+                              <span className="text-xs text-[#33332d] group-hover:text-[#5A5A40] font-sans font-medium truncate max-w-[140px]">
+                                {char.name}
                               </span>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-[#88887e] italic leading-relaxed">
-                          No actors generated yet. Go to Character Bible tab to summon them.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="p-3 bg-[#fcfcf9] rounded-xl border border-[#efeee8]">
-                      <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider text-[#a1a19a] mb-1">
-                        How to revise
-                      </h4>
-                      <p className="text-[10px] text-[#88887e] leading-relaxed">
-                        Input or write your chapter in the center, highlight any text, and choose a refinement vector inside the Assistant tab.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {leftSidebarTab === "outline" && (
-                  <div className="space-y-3 flex-1 flex flex-col justify-between">
-                    <div className="space-y-2.5">
-                      {story.outline.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-lg border text-xs flex flex-col justify-between gap-1.5 transition-all ${
-                            item.isCompleted
-                              ? "bg-[#ecece4]/50 border-[#dcdcd4]/60 opacity-60"
-                              : "bg-white border-[#e5e5df] shadow-xs"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              checked={item.isCompleted}
-                              onChange={() => toggleOutlineItem(item.id)}
-                              className="mt-0.5 rounded accent-[#5A5A40]"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <input
-                                type="text"
-                                value={item.title}
-                                onChange={(e) => handleUpdateOutlineTitle(item.id, e.target.value)}
-                                className="font-sans font-semibold text-xs text-[#33332d] w-full bg-transparent border-b border-transparent hover:border-[#ecece4] focus:outline-none focus:border-[#5A5A40]"
-                              />
-                              <textarea
-                                value={item.notes}
-                                onChange={(e) => handleUpdateOutlineNotes(item.id, e.target.value)}
-                                rows={2}
-                                className="text-[11px] text-[#88887e] w-full bg-transparent border-none focus:outline-none leading-relaxed mt-1 resize-none"
-                              />
-                            </div>
+                            <span className="text-[8px] font-mono text-[#a1a19a] opacity-0 group-hover:opacity-100 transition-opacity">
+                              Introduces
+                            </span>
                           </div>
-                          <div className="flex justify-end pr-0.5">
-                            <button
-                              onClick={() => removeOutlineItem(item.id)}
-                              className="text-red-500 hover:text-red-700 opacity-60 hover:opacity-100 transition-opacity"
-                              title="Delete Beat"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      <button
-                        onClick={handleAddOutlineItem}
-                        className="w-full py-2 border border-dashed border-[#d5d5cd] rounded-lg text-xs font-sans text-[#5A5A40] hover:bg-[#efeee8] flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Append Outline Beat
-                      </button>
-                    </div>
-
-                    <div className="p-3 bg-white border border-[#efeee8] rounded-xl">
-                      <h4 className="font-sans text-[8px] font-bold text-[#5A5A40] uppercase tracking-wider mb-1">
-                        Timeline Progress
-                      </h4>
-                      <div className="w-full bg-[#ecece4] h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-[#5A5A40] h-full transition-all duration-500"
-                          style={{
-                            width: `${
-                              story.outline.length > 0
-                                ? (story.outline.filter((o) => o.isCompleted).length / story.outline.length) * 100
-                                : 0
-                            }%`,
-                          }}
-                        />
+                        ))}
                       </div>
+                    ) : (
+                      <p className="text-[10px] text-[#88887e] italic leading-relaxed">
+                        No actors generated yet. Go to Character Bible tab to summon them.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-[#fcfcf9] rounded-xl border border-[#efeee8]">
+                    <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider text-[#a1a19a] mb-1">
+                      How to revise
+                    </h4>
+                    <p className="text-[10px] text-[#88887e] leading-relaxed">
+                      Input or write your chapter in the center, highlight any text, and choose a refinement vector inside the Assistant tab.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {leftSidebarTab === "outline" && (
+                <div className="space-y-3 flex-1 flex flex-col justify-between">
+                  <div className="space-y-2.5">
+                    {story.outline.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`p-3 rounded-lg border text-xs flex flex-col justify-between gap-1.5 transition-all ${
+                          item.isCompleted
+                            ? "bg-[#ecece4]/50 border-[#dcdcd4]/60 opacity-60"
+                            : "bg-white border-[#e5e5df] shadow-xs"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={item.isCompleted}
+                            onChange={() => toggleOutlineItem(item.id)}
+                            className="mt-0.5 rounded accent-[#5A5A40]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="text"
+                              value={item.title}
+                              onChange={(e) => handleUpdateOutlineTitle(item.id, e.target.value)}
+                              className="font-sans font-semibold text-xs text-[#33332d] w-full bg-transparent border-b border-transparent hover:border-[#ecece4] focus:outline-none focus:border-[#5A5A40]"
+                            />
+                            <textarea
+                              value={item.notes}
+                              onChange={(e) => handleUpdateOutlineNotes(item.id, e.target.value)}
+                              rows={2}
+                              className="text-[11px] text-[#88887e] w-full bg-transparent border-none focus:outline-none leading-relaxed mt-1 resize-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end pr-0.5">
+                          <button
+                            onClick={() => removeOutlineItem(item.id)}
+                            className="text-red-500 hover:text-red-700 opacity-60 hover:opacity-100 transition-opacity"
+                            title="Delete Beat"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      onClick={handleAddOutlineItem}
+                      className="w-full py-2 border border-dashed border-[#d5d5cd] rounded-lg text-xs font-sans text-[#5A5A40] hover:bg-[#efeee8] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Append Outline Beat
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-white border border-[#efeee8] rounded-xl">
+                    <h4 className="font-sans text-[8px] font-bold text-[#5A5A40] uppercase tracking-wider mb-1">
+                      Timeline Progress
+                    </h4>
+                    <div className="w-full bg-[#ecece4] h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-[#5A5A40] h-full transition-all duration-500"
+                        style={{
+                          width: `${
+                            story.outline.length > 0
+                              ? (story.outline.filter((o) => o.isCompleted).length / story.outline.length) * 100
+                              : 0
+                          }%`,
+                        }}
+                      />
                     </div>
                   </div>
-                )}
-              </aside>
-            )}
+                </div>
+              )}
+            </aside>
 
             {/* Middle Module: Story writing sheet */}
             <main className="flex-1 bg-white p-6 md:p-10 flex flex-col justify-between overflow-y-auto">
               <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-4 border-b border-[#efeee8] pb-4">
-                  <div>
+                <div className="flex items-center justify-between gap-4 mb-4 border-b border-[#efeee8] pb-4">
+                  <button
+                    onClick={() => setIsLeftOpen(!isLeftOpen)}
+                    className="p-1 md:p-1.5 px-3 bg-white hover:bg-[#efeee8] border border-[#d5d5cd] rounded-lg text-xs font-sans text-[#5A5A40] flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="Toggle chapters on/off (Ctrl + B)"
+                  >
+                    {isLeftOpen ? "📂 Close" : "📁 Chapters"}
+                  </button>
+
+                  <div className="flex-1">
                     <span className="font-sans text-[10px] text-[#88887e] tracking-widest uppercase block mb-1">
                       Manuscript Drafting Box
                     </span>
                     <input
                       type="text"
-                      value={story.title}
-                      onChange={(e) => setStory({ ...story, title: e.target.value })}
-                      className="text-2xl sm:text-3xl font-display font-medium text-[#1a1a15] bg-transparent border-b border-transparent hover:border-[#e5e5df] focus:outline-none focus:border-[#5A5A40] w-full font-semibold max-w-lg italic"
-                      placeholder="Give your masterpiece a title"
+                      value={activeCh.title}
+                      onChange={(e) => {
+                        const newTitle = e.target.value;
+                        setStory((prev) => ({
+                          ...prev,
+                          chapters: prev.chapters.map((ch) =>
+                            ch.id === activeChapterId ? { ...ch, title: newTitle } : ch
+                          ),
+                        }));
+                      }}
+                      className="text-xl sm:text-2xl font-display font-medium text-[#1a1a15] bg-transparent border-b border-transparent hover:border-[#e5e5df] focus:outline-none focus:border-[#5A5A40] w-full font-semibold max-w-lg italic"
+                      placeholder="Chapter Title"
                     />
                   </div>
 
-                  <button
-                    onClick={() => setFocusMode(!focusMode)}
-                    className="p-1 px-2.5 rounded-full border border-[#ecece4] text-[#88887e] hover:bg-[#efeee8] hover:text-[#33332d] text-[10px] font-sans flex items-center gap-1 transition-all"
-                  >
-                    <Maximize className="w-3 h-3" /> {focusMode ? "Show Tools" : "Focus Mode"}
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setFocusMode(!focusMode)}
+                      className="p-1 px-2.5 border border-[#ecece4] text-[#88887e] hover:bg-[#efeee8] hover:text-[#33332d] text-xs font-sans flex items-center gap-1 transition-all"
+                      title="Toggle distraction-free writing"
+                    >
+                      <Maximize className="w-3.5 h-3.5" />
+                    </button>
+                    
+                    <button
+                      onClick={() => setIsRightOpen(!isRightOpen)}
+                      className="p-1 md:p-1.5 px-3 bg-white hover:bg-[#efeee8] border border-[#d5d5cd] rounded-lg text-xs font-sans text-[#5A5A40] flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Toggle Gemini helper (Ctrl + J)"
+                    >
+                      {isRightOpen ? "🤖 Close AI" : "🤖 Ask Gemini"}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Main draft Area */}
@@ -609,10 +800,8 @@ export default function App() {
                   <label htmlFor="chapter-textarea" className="sr-only">Manuscript Story Text</label>
                   <textarea
                     id="chapter-textarea"
-                    value={story.manuscript}
-                    onChange={(e) => {
-                      setStory({ ...story, manuscript: e.target.value });
-                    }}
+                    value={activeCh.content}
+                    onChange={(e) => handleTextChange(e.target.value)}
                     onMouseUp={checkSelection}
                     onKeyUp={checkSelection}
                     placeholder="Inscribe your chapter prose here. Click anywhere to reset tool highlights..."
@@ -663,8 +852,7 @@ export default function App() {
             </main>
 
             {/* Right Sidebar: Side Editorial & Co-writer Panel */}
-            {!focusMode && (
-              <aside className="w-full lg:w-80 border-l border-[#e5e5df] bg-[#f9f9f5] flex flex-col p-4 shrink-0 overflow-y-auto">
+            <aside className={`h-full border-l border-[#e5e5df] bg-[#f9f9f5] flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ease-in-out ${isRightOpen ? 'w-full lg:w-80 p-4' : 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden border-none'}`}>
                 {/* Panel Selector tabs */}
                 <div className="flex border-b border-[#e5e5df] mb-4 pb-px text-xs shrink-0">
                   <button
@@ -788,7 +976,6 @@ export default function App() {
                   )}
                 </div>
               </aside>
-            )}
           </>
         )}
 

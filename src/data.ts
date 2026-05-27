@@ -47,6 +47,19 @@ The constant drip of the ceiling leak froze. A fat water droplet held suspended 
 Arthur drew a ragged breath. The air felt heavy, like cold syrup in his lungs. He walked to the window, watching the absolute stillness. 
 
 Five seconds later, a sharp chime rang. The feline completed its fall, splashing into the murky rainwater, and the water droplet hit the wooden floorboards with a soft tap. Arthur gasped, collapsing into his chair. He glanced at his reflection in the watch's polished back. In his mirror image, the grey at his temples had marched a centimeter deeper, and a deep tiredness settled in his knees. He had gained a miracle, but his bones knew the terrible tariff he had just paid.`,
+  chapters: [
+    {
+      id: "chapter-1",
+      title: "Chapter 1: The Five-Second Gear",
+      content: `The rain in Sector 8 never really fell; it hovered in the air like a damp neon fog. \n\nArthur Vance sat at his scarred cedar desk, a brass magnifying loupe pinched into the orbit of his right eye. Before him lay the carcass of a watch no larger than a plum, its back casing etched with constellations no astronomer had ever cataloged.\n\nHe worked by the amber hum of a sodium lamp. Arthur had repaired chronometers for four decades, yet this mechanisms defied logic. Its gears were cut in primes—seventeen teeth, thirteen teeth, eleven teeth. They folded into one another with a whisper like dry autumn leaves.\n\n"Almost," Arthur muttered to himself. His fingers, spotted with liver stains and engine grease, coaxed the mainspring tension screw.\n\nHe turned the winding stem. One click. Two. On the third click, the universe stopped.\n\nThe constant drip of the ceiling leak froze. A fat water droplet held suspended in mid-air, a pearled tear reflecting the bright green light of the noodle shop opposite his window. Outside on the neon-washed street, a stray cat remained caught mid-leap over a puddle, its paws rigid in the misty air.\n\nArthur drew a ragged breath. The air felt heavy, like cold syrup in his lungs. He walked to the window, watching the absolute stillness. \n\nFive seconds later, a sharp chime rang. The feline completed its fall, splashing into the murky rainwater, and the water droplet hit the wooden floorboards with a soft tap. Arthur gasped, collapsing into his chair. He glanced at his reflection in the watch's polished back. In his mirror image, the grey at his temples had marched a centimeter deeper, and a deep tiredness settled in his knees. He had gained a miracle, but his bones knew the terrible tariff he had just paid.`
+    },
+    {
+      id: "chapter-2",
+      title: "Chapter 2: The Underbelly Bargain",
+      content: `The hum of Sector 8's trade tracks vibrated through Arthur's workshop long before the heavy security latch clicked open. \n\nValerie Chen didn't knock. She stepped inside with a fluid, predator-soft grace, her obsidian coat shimmering with rain and pink neon highlights from the street-level signs.\n\n"You're late, old man," Valerie said, flipping a polished brass screw into the air and catching it. Her pink cybernetic eye whirred softly, scanning the shelves. "The Boss wants his tribute, and he has little patience for ticking metal."`
+    }
+  ],
+  activeChapterId: "chapter-1",
   characters: [
     {
       id: "char-1",

@@ -28,9 +28,17 @@ export interface Story {
   tone: string;
   summary: string;
   manuscript: string;
+  chapters: Document[];
+  activeChapterId: string;
   characters: Character[];
   outline: OutlineItem[];
   lastSavedAt: string;
+}
+
+export interface Document {
+  id: string;
+  title: string;
+  content: string;
 }
 
 export interface ChatMessage {
