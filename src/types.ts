@@ -49,7 +49,7 @@ export interface ChatMessage {
 }
 
 export type SidebarTab = "details" | "characters" | "outline" | "lore";
-export type AiTab = "continue" | "refine" | "brainstorm" | "chat";
+export type AiTab = "continue" | "refine" | "brainstorm" | "chat" | "analytics";
 export type RefineMode = "polish" | "shorten" | "show-not-tell" | "custom";
 
 export interface LoreBookItem {

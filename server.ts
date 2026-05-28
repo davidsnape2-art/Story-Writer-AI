@@ -228,6 +228,47 @@ app.post("/api/gemini/chat", async (req, res) => {
   }
 });
 
+// 5.5. Editorial Chapter Analytics (Sensory Check, Pacing, Beta Critique)
+app.post("/api/gemini/analyze-chapter", async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: "Chapter manuscript content is required for analysis." });
+    }
+    const ai = getGeminiClient();
+
+    const analysisPrompt = `
+You are an expert literary editor, novel design coordinator, and a detail-oriented beta reader. 
+Analyze the following story chapter text comprehensively across three key metrics:
+- Sensory balance check (sight, sound, smell, taste, touch)
+- Pacing flow (scene density, speed, description vs action)
+- Objective beta reader critique (emotional resonance, plot plausibility, character logic)
+
+Provide your analysis strictly broken into three clear blocks using these exact structural tags:
+[SENSORY CHECK]: Evaluate the presence of visceral details. Spot missing senses and explain how to inject them.
+[PACING REPORT]: Pinpoint where the narrative moves too fast, too slow, or drags unnecessarily.
+[BETA READER CRITIQUE]: Provide honest structural observations regarding character motives, credibility, and reader engagement.
+
+Here is the chapter text to analyze:
+"${content}"
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: analysisPrompt,
+      config: {
+        systemInstruction: "You are an award-winning creative writing instructor and structural book critique partner. Provide helpful, precise, objective, and constructive advice without generic praise. Focus purely on literary enhancements.",
+        temperature: 0.75,
+      },
+    });
+
+    res.json({ text: response.text || "" });
+  } catch (error: any) {
+    console.error("Gemini Chapter Analyze Error:", error);
+    res.status(500).json({ error: error.message || "An error occurred during chapter analysis." });
+  }
+});
+
 // 6. Generate 3 story beginnings or plot outlines based on inputs
 app.post("/api/gemini/story-starter", async (req, res) => {
   try {

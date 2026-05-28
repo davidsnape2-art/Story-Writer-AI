@@ -25,7 +25,8 @@ import {
   Info,
   Maximize,
   Sliders,
-  Sparkle
+  Sparkle,
+  BarChart2
 } from "lucide-react";
 
 import { Story, Character, OutlineItem, SidebarTab, AiTab, LoreBookItem } from "./types";
@@ -52,7 +53,7 @@ export default function App() {
 
   const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "incubate" | "world" | "characters">("canvas");
   const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline" | "lore">("structure");
-  const [rightPanelTab, setRightPanelTab] = useState<"refine" | "chat" | "brainstorm">("refine");
+  const [rightPanelTab, setRightPanelTab] = useState<AiTab>("refine");
 
   // World Lore Codex state - lazy initialization from LocalStorage
   const [loreBook, setLoreBook] = useState<LoreBookItem[]>(() => {
@@ -75,6 +76,20 @@ export default function App() {
 
   // Selection states & floating contextual menu
   const [highlightedText, setHighlightedText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyticsResult, setAnalyticsResult] = useState<{
+    sensory: string;
+    pacing: string;
+    beta: string;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem("ai_story_analytics");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [expansionInstruction, setExpansionInstruction] = useState("");
   const [expandingActive, setExpandingActive] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -145,6 +160,18 @@ export default function App() {
     }
   }, [loreBook]);
 
+  useEffect(() => {
+    try {
+      if (analyticsResult) {
+        localStorage.setItem("ai_story_analytics", JSON.stringify(analyticsResult));
+      } else {
+        localStorage.removeItem("ai_story_analytics");
+      }
+    } catch (e) {
+      console.error("Failed to save analytics result to localStorage", e);
+    }
+  }, [analyticsResult]);
+
   // Active Chapter resolution
   const activeChapterId = story.activeChapterId || (story.chapters[0]?.id) || "chapter-1";
   const activeCh = story.chapters.find((c) => c.id === activeChapterId) || story.chapters[0] || { id: "chapter-1", title: "Chapter 1", content: "" };
@@ -199,6 +226,47 @@ export default function App() {
     setLoreBook((prev) => prev.filter(l => l.id !== id));
     if (item) {
       showNotification(`Removed "${item.keyword}" from World Lore Codex.`);
+    }
+  };
+
+  const handleAnalyzeChapter = async () => {
+    if (isAnalyzing || !activeCh.content.trim()) return;
+    setIsAnalyzing(true);
+    showNotification("Reviewing chapter manuscript with Editorial Desk...");
+
+    try {
+      const response = await fetch("/api/gemini/analyze-chapter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: activeCh.content,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const rawText = data.text || "";
+
+      // Parse the output block sections cleanly using split processing
+      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]:?([\s\S]*?)(?=\[PACING|$)/i);
+      const pacingMatch = rawText.match(/\[PACING REPORT\]:?([\s\S]*?)(?=\[BETA|$)/i);
+      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]:?([\s\S]*?)$/i);
+
+      setAnalyticsResult({
+        sensory: sensoryMatch ? sensoryMatch[1].trim() : "Analysis parsing failed for this segment.",
+        pacing: pacingMatch ? pacingMatch[1].trim() : "Analysis parsing failed for this segment.",
+        beta: betaMatch ? betaMatch[1].trim() : rawText // Fallback to raw response if structure broke
+      });
+
+      showNotification("Chapter analysis loaded successfully!");
+    } catch (error: any) {
+      console.error("Analytics extraction failed:", error);
+      showNotification("Analytics failed: " + (error.message || "Unknown error"));
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -330,6 +398,7 @@ export default function App() {
         manuscript: selectedCh ? selectedCh.content : prev.manuscript,
       };
     });
+    setAnalyticsResult(null);
   };
 
   const handleAddNewChapter = () => {
@@ -1290,14 +1359,14 @@ export default function App() {
                 </div>
 
                 {/* Panel Selector tabs */}
-                <div className="flex border-b border-[#e5e5df] mb-4 pb-px text-xs shrink-0">
+                <div className="flex border-b border-[#e5e5df] mb-4 pb-px text-[10px] shrink-0 gap-1">
                   <button
                     onClick={() => setRightPanelTab("refine")}
                     className={`flex-1 pb-2 font-sans font-semibold text-center uppercase tracking-wider cursor-pointer border-b ${
                       rightPanelTab === "refine" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
                     }`}
                   >
-                    ✨ Style Refiner
+                    ✨ Style
                   </button>
                   <button
                     onClick={() => setRightPanelTab("chat")}
@@ -1305,7 +1374,7 @@ export default function App() {
                       rightPanelTab === "chat" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
                     }`}
                   >
-                    💬 Co-Writer Chat
+                    💬 Chat
                   </button>
                   <button
                     onClick={() => setRightPanelTab("brainstorm")}
@@ -1314,6 +1383,14 @@ export default function App() {
                     }`}
                   >
                     🧠 Sparks
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab("analytics")}
+                    className={`flex-1 pb-2 font-sans font-semibold text-center uppercase tracking-wider cursor-pointer border-b ${
+                      rightPanelTab === "analytics" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
+                    }`}
+                  >
+                    📊 Editorial
                   </button>
                 </div>
 
@@ -1408,6 +1485,81 @@ export default function App() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {rightPanelTab === "analytics" && (
+                    <div className="space-y-4 animate-fadeIn">
+                      <div className="bg-[#fcfcf9] p-5 rounded-xl border border-[#e5e5df] space-y-4 shadow-sm animate-slideDown">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#5A5A40]" />
+                          <h4 className="font-display font-medium text-xs text-[#33332d] uppercase tracking-wider">
+                            Editorial Desk
+                          </h4>
+                        </div>
+                        <p className="text-[11px] text-[#88887e] leading-relaxed">
+                          Submit this chapter manuscript for a professional development edit. Gemini acts as an expert developmental editor to rate sensory ratios, pacing drag, and plot logic.
+                        </p>
+
+                        <button
+                          onClick={handleAnalyzeChapter}
+                          disabled={isAnalyzing || !activeCh.content.trim()}
+                          className="w-full py-2.5 bg-[#5A5A40] text-white hover:bg-[#4a4a35] disabled:bg-[#a1a19a] rounded-lg font-sans text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          {isAnalyzing ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Reviewing Manuscript...
+                            </>
+                          ) : (
+                            <>
+                              <BarChart2 className="w-3.5 h-3.5" /> Run Chapter Analytics
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {analyticsResult ? (
+                          <>
+                            <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
+                              <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider mb-2">
+                                👃 Sensory Balance Check
+                              </h5>
+                              <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
+                                {analyticsResult.sensory}
+                              </p>
+                            </div>
+
+                            <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
+                              <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider mb-2">
+                                ⏱️ Pacing Report
+                              </h5>
+                              <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
+                                {analyticsResult.pacing}
+                              </p>
+                            </div>
+
+                            <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
+                              <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider mb-2">
+                                🕵️ Beta Reader Critique
+                              </h5>
+                              <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
+                                {analyticsResult.beta}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="bg-white p-6 rounded-xl border border-[#e5e5df] text-center space-y-2">
+                            <span className="text-2xl block">📊</span>
+                            <span className="font-sans font-bold text-[10px] text-[#33332d] uppercase tracking-wider block">
+                              Manuscript Analysis Staged
+                            </span>
+                            <p className="text-[10px] text-[#88887e] leading-relaxed">
+                              Click the button above to have Gemini critique language layers, plot consistency, and pacing delivery.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
