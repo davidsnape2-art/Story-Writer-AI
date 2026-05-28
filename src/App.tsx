@@ -59,6 +59,10 @@ export default function App() {
   const [expansionInstruction, setExpansionInstruction] = useState("");
   const [expandingActive, setExpandingActive] = useState(false);
 
+  // New: Inline complete co-writer state & refs
+  const [isGenerating, setIsGenerating] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Quick Brainstorm outputs in right sidebar
   const [brainstormType, setBrainstormType] = useState<"twist" | "title" | "outline">("twist");
   const [brainstormPrompt, setBrainstormPrompt] = useState("");
@@ -127,6 +131,75 @@ export default function App() {
     }, 4000);
   };
 
+  const handleInlineComplete = async () => {
+    const textarea = textareaRef.current;
+    if (!textarea || isGenerating) return;
+
+    // 1. Find exactly where the user is typing
+    const cursorPosition = textarea.selectionStart;
+    const currentVal = textarea.value;
+    const textBeforeCursor = currentVal.substring(0, cursorPosition);
+    const textAfterCursor = currentVal.substring(cursorPosition);
+
+    if (!textBeforeCursor.trim()) return; // Don't invoke if there's no context
+
+    setIsGenerating(true);
+    showNotification("Gemini is composing continuous prose...");
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: textBeforeCursor,
+          context: "You are a creative co-writer. Continue the story seamlessly based on the text provided. Do not repeat the prompt. Provide only the next 1-3 sentences.",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+
+      const data = await response.json();
+      const generatedText = data.text || "...the story stalled.";
+
+      // 3. Inject Gemini's text right at the cursor position
+      const updatedContent = textBeforeCursor + generatedText + textAfterCursor;
+      
+      setStory((prev) => {
+        const nextChapters = prev.chapters.map((ch) =>
+          ch.id === activeChapterId ? { ...ch, content: updatedContent } : ch
+        );
+        return {
+          ...prev,
+          manuscript: updatedContent,
+          chapters: nextChapters,
+          lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+      });
+
+      showNotification("Surgically fused improved prose.");
+
+      // 4. UX Polish: Return focus to the textarea and snap the cursor to the end of the new text
+      setTimeout(() => {
+        textarea.focus();
+        const newCursorPos = cursorPosition + generatedText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 10);
+
+    } catch (error) {
+      console.error("Gemini context pipeline failed:", error);
+      showNotification("Inline completion stalled. Please verify credentials.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleInlineCompleteRef = useRef(handleInlineComplete);
+  useEffect(() => {
+    handleInlineCompleteRef.current = handleInlineComplete;
+  });
+
   // Keyboard short-cuts listener for sidebar drawer toggles & escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -141,6 +214,12 @@ export default function App() {
       if (isMeta && e.key.toLowerCase() === "j") {
         e.preventDefault();
         setIsRightOpen((prev) => !prev);
+      }
+
+      // NEW: Ctrl + Space triggers the Gemini co-writer
+      if (isMeta && (e.code === "Space" || e.key === " ")) {
+        e.preventDefault();
+        handleInlineCompleteRef.current?.();
       }
 
       if (e.key === "Escape") {
@@ -822,10 +901,8 @@ export default function App() {
                       {isRightOpen ? "🤖 Close AI" : "🤖 Ask Gemini"}
                     </button>
                   </div>
-                </div>
-
-                {/* Main draft Area */}
-                <div className="flex-1 flex flex-col min-h-[350px]">
+                     {/* Main draft Area */}
+                <div className="flex-1 flex flex-col min-h-[350px] relative">
                   {/* Quick select highlights banner */}
                   {highlightedText && (
                     <div className="bg-[#ecece4] px-4 py-2.5 rounded-xl border border-[#dcdcd4] flex items-center justify-between text-xs mb-3 animate-pulse">
@@ -844,18 +921,29 @@ export default function App() {
                       </button>
                     </div>
                   )}
-
+ 
                   <label htmlFor="chapter-textarea" className="sr-only">Manuscript Story Text</label>
                   <textarea
+                    ref={textareaRef}
                     id="chapter-textarea"
                     value={activeCh.content}
                     onChange={(e) => handleTextChange(e.target.value)}
                     onMouseUp={checkSelection}
                     onKeyUp={checkSelection}
-                    placeholder="Inscribe your chapter prose here. Click anywhere to reset tool highlights..."
-                    className="w-full flex-1 font-serif text-[15px] leading-relaxed text-[#33332d] bg-transparent border-none placeholder-[#a1a19a] focus:ring-0 focus:outline-none resize-none pt-2"
+                    disabled={isGenerating}
+                    placeholder="Inscribe your chapter prose here. Press Ctrl + Space to let Gemini co-write..."
+                    className="w-full flex-1 font-serif text-[15px] leading-relaxed text-[#33332d] bg-transparent border-none placeholder-[#a1a19a] focus:ring-0 focus:outline-none resize-none pt-2 transition-opacity duration-200"
+                    style={{ opacity: isGenerating ? 0.65 : 1 }}
                   />
-                </div>
+
+                  {/* Subtle Floating Status Indicator */}
+                  {isGenerating && (
+                    <div className="absolute bottom-4 right-4 bg-[#5A5A40] text-white px-4 py-2 rounded-full text-xs font-sans shadow-lg flex items-center gap-2 animate-pulse border border-[#ecece4]">
+                      <Sparkles className="w-3.5 h-3.5 text-[#a3b18a] animate-spin" />
+                      <span>Gemini is composing...</span>
+                    </div>
+                  )}
+                </div>             </div>
 
                 {/* Continue/Expand continuous interface */}
                 <div className="mt-8 pt-6 border-t border-[#efeee8]">

@@ -96,6 +96,28 @@ app.post("/api/gemini/expand", async (req, res) => {
   }
 });
 
+// 2.5. Inline co-writer generation
+app.post("/api/generate", async (req, res) => {
+  try {
+    const { prompt, context } = req.body;
+    const ai = getGeminiClient();
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: `Prompt (the story context so far):\n"""\n${prompt}\n"""\n\nInstructions: ${context || "Continue the story seamlessly. Write the next 1-3 sentences only."}`,
+      config: {
+        systemInstruction: "You are an elite novelist co-writer. Continue the user's story instantly. Provide ONLY the new continuous text. No introductory remarks, no greetings, no surrounding quotes.",
+        temperature: 0.8,
+      },
+    });
+
+    res.json({ text: response.text || "" });
+  } catch (error: any) {
+    console.error("Gemini Inline Generation Error:", error);
+    res.status(500).json({ error: error.message || "An error occurred during inline generation." });
+  }
+});
+
 // 3. Prose Refiner / Style Editor
 app.post("/api/gemini/refine", async (req, res) => {
   try {
