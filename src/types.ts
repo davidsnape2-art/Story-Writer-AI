@@ -48,6 +48,13 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-export type SidebarTab = "details" | "characters" | "outline";
+export type SidebarTab = "details" | "characters" | "outline" | "lore";
 export type AiTab = "continue" | "refine" | "brainstorm" | "chat";
 export type RefineMode = "polish" | "shorten" | "show-not-tell" | "custom";
+
+export interface LoreBookItem {
+  id: string;
+  keyword: string;
+  description: string;
+}
+

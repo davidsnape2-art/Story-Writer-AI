@@ -28,7 +28,7 @@ import {
   Sparkle
 } from "lucide-react";
 
-import { Story, Character, OutlineItem, SidebarTab, AiTab } from "./types";
+import { Story, Character, OutlineItem, SidebarTab, AiTab, LoreBookItem } from "./types";
 import { INITIAL_STORY, GENRES, TONES } from "./data";
 
 // Import custom sub-modules
@@ -51,8 +51,27 @@ export default function App() {
   });
 
   const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "incubate" | "world" | "characters">("canvas");
-  const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline">("structure");
+  const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline" | "lore">("structure");
   const [rightPanelTab, setRightPanelTab] = useState<"refine" | "chat" | "brainstorm">("refine");
+
+  // World Lore Codex state - lazy initialization from LocalStorage
+  const [loreBook, setLoreBook] = useState<LoreBookItem[]>(() => {
+    try {
+      const savedLore = localStorage.getItem("ai_story_lore");
+      return savedLore ? JSON.parse(savedLore) : [
+        { id: "l1", keyword: "Arthur", description: "An old clockmaker in a rain-slicked city who discovered a brass pocketwatch that freezes time." },
+        { id: "l2", keyword: "Valerie", description: "A sharp, cybernetic-eyed courier who works for Sector 8's underworld Boss." }
+      ];
+    } catch (e) {
+      return [
+        { id: "l1", keyword: "Arthur", description: "An old clockmaker in a rain-slicked city who discovered a brass pocketwatch that freezes time." },
+        { id: "l2", keyword: "Valerie", description: "A sharp, cybernetic-eyed courier who works for Sector 8's underworld Boss." }
+      ];
+    }
+  });
+
+  const [newKey, setNewKey] = useState("");
+  const [newDesc, setNewDesc] = useState("");
 
   // Selection states & floating contextual menu
   const [highlightedText, setHighlightedText] = useState("");
@@ -118,6 +137,14 @@ export default function App() {
     }
   }, [isRightOpen]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_story_lore", JSON.stringify(loreBook));
+    } catch (e) {
+      console.error("Failed to save lore book to localStorage", e);
+    }
+  }, [loreBook]);
+
   // Active Chapter resolution
   const activeChapterId = story.activeChapterId || (story.chapters[0]?.id) || "chapter-1";
   const activeCh = story.chapters.find((c) => c.id === activeChapterId) || story.chapters[0] || { id: "chapter-1", title: "Chapter 1", content: "" };
@@ -132,6 +159,47 @@ export default function App() {
     setTimeout(() => {
       setNotifications((prev) => prev.slice(0, -1));
     }, 4000);
+  };
+
+  // Compile matching lore context for Gemini's prompt inclusion
+  const compileLoreContext = (textToScan: string) => {
+    if (!textToScan) return "";
+    
+    const matchedLore = loreBook.filter(item => {
+      // Case-insensitive word boundary regex exact match
+      const regex = new RegExp(`\\b${item.keyword}\\b`, "i");
+      return regex.test(textToScan);
+    });
+
+    if (matchedLore.length === 0) return "";
+
+    return `\n\n[CRITICAL STORY CONTEXT/LORE]:\nUse the following continuity rules for any characters or elements mentioned:\n` + 
+      matchedLore.map(item => `- ${item.keyword}: ${item.description}`).join("\n");
+  };
+
+  // Lore Book events
+  const handleAddLore = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newKey.trim() || !newDesc.trim()) return;
+
+    const newItem: LoreBookItem = {
+      id: "lore-" + Date.now().toString(),
+      keyword: newKey.trim(),
+      description: newDesc.trim()
+    };
+
+    setLoreBook((prev) => [...prev, newItem]);
+    setNewKey("");
+    setNewDesc("");
+    showNotification(`Added "${newItem.keyword}" to World Lore Codex.`);
+  };
+
+  const handleRemoveLore = (id: string) => {
+    const item = loreBook.find(l => l.id === id);
+    setLoreBook((prev) => prev.filter(l => l.id !== id));
+    if (item) {
+      showNotification(`Removed "${item.keyword}" from World Lore Codex.`);
+    }
   };
 
   const handleInlineComplete = async () => {
@@ -150,12 +218,15 @@ export default function App() {
     showNotification("Gemini is composing continuous prose...");
 
     try {
+      const structuralInstructions = "You are a creative co-writer. Continue the story seamlessly based on the text provided. Do not repeat the prompt. Provide only the next 1-3 sentences.";
+      const activeLoreContext = compileLoreContext(textBeforeCursor);
+
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: textBeforeCursor,
-          context: "You are a creative co-writer. Continue the story seamlessly based on the text provided. Do not repeat the prompt. Provide only the next 1-3 sentences.",
+          context: structuralInstructions + activeLoreContext,
         }),
       });
 
@@ -578,12 +649,14 @@ export default function App() {
     }
 
     try {
+      const activeLoreContext = compileLoreContext(selectionData.text);
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: selectionData.text,
-          context: contextInstructions
+          context: contextInstructions + activeLoreContext
         }),
       });
 
@@ -824,7 +897,7 @@ export default function App() {
               </div>
 
               {/* Left tab selectors */}
-              <div className="flex border-b border-[#e5e5df] mb-4">
+              <div className="flex border-b border-[#e5e5df] mb-4 gap-1">
                 <button
                   onClick={() => setLeftSidebarTab("structure")}
                   className={`flex-1 pb-1.5 text-center font-sans text-[10px] uppercase font-bold tracking-wider cursor-pointer border-b ${
@@ -840,6 +913,14 @@ export default function App() {
                   }`}
                 >
                   Acts ({story.outline.filter(o => !o.isCompleted).length})
+                </button>
+                <button
+                  onClick={() => setLeftSidebarTab("lore")}
+                  className={`flex-1 pb-1.5 text-center font-sans text-[10px] uppercase font-bold tracking-wider cursor-pointer border-b ${
+                    leftSidebarTab === "lore" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
+                  }`}
+                >
+                  Codex ({loreBook.length})
                 </button>
               </div>
 
@@ -961,6 +1042,70 @@ export default function App() {
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {leftSidebarTab === "lore" && (
+                <div className="space-y-4 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h4 className="font-sans text-[10px] font-bold uppercase tracking-wider mb-2.5 text-[#5A5A40]">
+                      World Lore Codex ({loreBook.length})
+                    </h4>
+                    <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                      {loreBook.length > 0 ? (
+                        loreBook.map((item) => (
+                          <div key={item.id} className="p-2.5 rounded-lg bg-white border border-[#e5e5df] relative group shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLore(item.id)}
+                              className="absolute top-1 right-2 w-4 h-4 rounded-full bg-[#f3f4f6] text-[#cc3333] hover:bg-red-100 flex items-center justify-center text-[10px] font-bold cursor-pointer transition-colors"
+                              title="Delete Entry"
+                            >
+                              &times;
+                            </button>
+                            <span className="font-bold text-xs text-[#33332d] block">{item.keyword}</span>
+                            <p className="text-[10px] text-[#88887e] mt-1 leading-relaxed">{item.description}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-[#88887e] italic leading-relaxed">
+                          Your Lore Codex is currently empty. Define characters, artifacts, or rules below to inject context automatically.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Add Lore Entry Form */}
+                  <form onSubmit={handleAddLore} className="bg-[#ecece4]/40 p-3.5 rounded-xl border border-[#dcdcd4]/60 space-y-2.5 mt-2 flex-shrink-0">
+                    <span className="text-[9px] font-sans font-bold uppercase tracking-wider text-[#5A5A40] block">
+                      Add New Codex Entry
+                    </span>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Keyword (e.g. Arthur, timepiece)"
+                        value={newKey}
+                        onChange={(e) => setNewKey(e.target.value)}
+                        className="w-full text-xs font-sans p-2 bg-[#fcfcf9] border border-[#d5d5cd] rounded-lg text-[#33332d] focus:outline-none focus:border-[#5A5A40] placeholder-[#a1a19a]"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <textarea
+                        placeholder="Lore rules, traits, or characteristics..."
+                        value={newDesc}
+                        onChange={(e) => setNewDesc(e.target.value)}
+                        className="w-full text-xs font-sans p-2 h-16 bg-[#fcfcf9] border border-[#d5d5cd] rounded-lg text-[#33332d] focus:outline-none focus:border-[#5A5A40] placeholder-[#a1a19a] resize-none"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-[#5A5A40] hover:bg-[#4a4a33] text-white text-[10px] uppercase font-bold tracking-wider py-2 px-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Save to Codex
+                    </button>
+                  </form>
                 </div>
               )}
             </aside>
@@ -1133,6 +1278,17 @@ export default function App() {
 
             {/* Right Sidebar: Side Editorial & Co-writer Panel */}
             <aside className={`h-full border-l border-[#e5e5df] bg-[#f9f9f5] flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ease-in-out ${isRightOpen ? 'w-full lg:w-80 p-4' : 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden border-none'}`}>
+                {/* Lore Engine Status Info */}
+                <div className="bg-[#ecece4]/60 p-3 rounded-xl border border-[#dcdcd4] text-xs mb-4 shrink-0">
+                  <div className="flex items-center gap-1.5 font-sans font-bold text-[#5A5A40] mb-1">
+                    <Sparkles className="w-3.5 h-3.5 text-[#5A5A40]" />
+                    <span>Lore Engine Active</span>
+                  </div>
+                  <p className="text-[10px] text-[#88887e] leading-relaxed">
+                    Type a matching keyword from your <strong>Codex</strong> (such as <strong>Arthur</strong> or <strong>Valerie</strong>) in the draft, then press <kbd className="bg-white px-1 border border-gray-300 rounded font-mono text-[9px] text-[#33332d]">Ctrl + Space</kbd> to co-write or highlight prose. The matching profiles will automatically be appended as critical constraints to protect character and world continuity!
+                  </p>
+                </div>
+
                 {/* Panel Selector tabs */}
                 <div className="flex border-b border-[#e5e5df] mb-4 pb-px text-xs shrink-0">
                   <button
