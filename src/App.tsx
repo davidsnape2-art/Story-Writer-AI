@@ -54,10 +54,13 @@ export default function App() {
   const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline">("structure");
   const [rightPanelTab, setRightPanelTab] = useState<"refine" | "chat" | "brainstorm">("refine");
 
-  // Selection states
+  // Selection states & floating contextual menu
   const [highlightedText, setHighlightedText] = useState("");
   const [expansionInstruction, setExpansionInstruction] = useState("");
   const [expandingActive, setExpandingActive] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuCoords, setMenuCoords] = useState({ x: 0, y: 0 });
+  const [selectionData, setSelectionData] = useState({ start: 0, end: 0, text: "" });
 
   // New: Inline complete co-writer state & refs
   const [isGenerating, setIsGenerating] = useState(false);
@@ -509,12 +512,123 @@ export default function App() {
     }));
   };
 
+  // Capture Text Highlight & Mouse Coordinates
+  const handleTextareaMouseUp = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end).trim();
+
+    // Only reveal the floating menu if the user actually highlighted real text
+    if (selectedText.length > 0) {
+      setSelectionData({ start, end, text: selectedText });
+      setHighlightedText(selectedText);
+      
+      // Position the menu slightly above where the user released their mouse click
+      setMenuCoords({
+        x: e.clientX,
+        y: e.clientY - 55 // Offset upward to float neatly above selection
+      });
+      setShowMenu(true);
+    } else {
+      setShowMenu(false);
+    }
+  };
+
+  // Close the menu if the user clicks anywhere else
+  useEffect(() => {
+    const closeMenu = () => setShowMenu(false);
+    window.addEventListener("click", closeMenu);
+    return () => window.removeEventListener("click", closeMenu);
+  }, []);
+
   // Highlight selection catcher from manuscript text area
   const checkSelection = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
     const target = e.currentTarget;
     const selection = target.value.substring(target.selectionStart, target.selectionEnd);
     if (selection && selection.trim().length > 3) {
       setHighlightedText(selection);
+      setSelectionData({
+        start: target.selectionStart,
+        end: target.selectionEnd,
+        text: selection
+      });
+    } else {
+      setShowMenu(false);
+    }
+  };
+
+  // --- Trigger Selection Transform ---
+  const handleTransform = async (mode: 'show' | 'dialogue' | 'action') => {
+    if (isGenerating || !selectionData.text) return;
+    setShowMenu(false);
+    setIsGenerating(true);
+    showNotification(`Gemini is transforming prose with target style: "${mode}"...`);
+
+    // Map button choice to specific, specialized AI editing personas
+    let contextInstructions = "";
+    if (mode === 'show') {
+      contextInstructions = "Rewrite this scene using visceral sensory details (sight, sound, physical feelings). Show, don't tell. Keep the length roughly equivalent.";
+    } else if (mode === 'dialogue') {
+      contextInstructions = "Polish this dialogue to make it sound incredibly natural, sharp, and full of subtext or personality. Retain the core meaning.";
+    } else if (mode === 'action') {
+      contextInstructions = "Hype up the pacing. Rewrite this text using shorter sentences, punchy verbs, and rapid progression to maximize tension.";
+    }
+
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: selectionData.text,
+          context: contextInstructions
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+
+      const data = await response.json();
+      const transformedText = data.text || selectionData.text;
+
+      // Splice the transformed text right into the middle of the document
+      const updatedContent = 
+        activeCh.content.substring(0, selectionData.start) + 
+        transformedText + 
+        activeCh.content.substring(selectionData.end);
+
+      setStory((prev) => {
+        const nextChapters = prev.chapters.map((ch) =>
+          ch.id === activeChapterId ? { ...ch, content: updatedContent } : ch
+        );
+        return {
+          ...prev,
+          manuscript: updatedContent,
+          chapters: nextChapters,
+          lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+      });
+
+      showNotification("Surgically fused improved prose.");
+
+      // Return focus to textarea and reset
+      setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.focus();
+          setSelectionData({ start: 0, end: 0, text: "" });
+          setHighlightedText("");
+        }
+      }, 50);
+
+    } catch (error) {
+      console.error("Transformation pipeline failed:", error);
+      showNotification("Transformation failed. Please verify credentials.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -928,13 +1042,43 @@ export default function App() {
                     id="chapter-textarea"
                     value={activeCh.content}
                     onChange={(e) => handleTextChange(e.target.value)}
-                    onMouseUp={checkSelection}
+                    onMouseUp={handleTextareaMouseUp}
                     onKeyUp={checkSelection}
                     disabled={isGenerating}
                     placeholder="Inscribe your chapter prose here. Press Ctrl + Space to let Gemini co-write..."
                     className="w-full flex-1 font-serif text-[15px] leading-relaxed text-[#33332d] bg-transparent border-none placeholder-[#a1a19a] focus:ring-0 focus:outline-none resize-none pt-2 transition-opacity duration-200"
                     style={{ opacity: isGenerating ? 0.65 : 1 }}
                   />
+
+                  {/* FLOATING TRANSFORMATION CONTEXT MENU */}
+                  {showMenu && (
+                    <div 
+                      className="fixed flex bg-[#2c2c2e]/95 backdrop-blur-sm border border-[#48484a] rounded-full p-1 shadow-2xl z-50 transform -translate-x-1/2 gap-1 items-center"
+                      style={{ left: `${menuCoords.x}px`, top: `${menuCoords.y}px` }}
+                      onMouseDown={(e) => e.stopPropagation()} // Prevents text defocus when clicking buttons
+                    >
+                      <button 
+                        onClick={() => handleTransform('show')}
+                        className="bg-transparent border-none text-white hover:bg-[#3a3a3c] transition-colors rounded-full px-3 py-1 text-[11px] font-sans font-medium cursor-pointer flex items-center gap-1 shrink-0"
+                      >
+                        ⚡ Show, Don't Tell
+                      </button>
+                      <div className="w-px h-3 bg-[#48484a]" />
+                      <button 
+                        onClick={() => handleTransform('dialogue')}
+                        className="bg-transparent border-none text-white hover:bg-[#3a3a3c] transition-colors rounded-full px-3 py-1 text-[11px] font-sans font-medium cursor-pointer flex items-center gap-1 shrink-0"
+                      >
+                        💬 Polish Dialogue
+                      </button>
+                      <div className="w-px h-3 bg-[#48484a]" />
+                      <button 
+                        onClick={() => handleTransform('action')}
+                        className="bg-transparent border-none text-white hover:bg-[#3a3a3c] transition-colors rounded-full px-3 py-1 text-[11px] font-sans font-medium cursor-pointer flex items-center gap-1 shrink-0"
+                      >
+                        🏃‍♂️ Speed Up Pace
+                      </button>
+                    </div>
+                  )}
 
                   {/* Subtle Floating Status Indicator */}
                   {isGenerating && (
