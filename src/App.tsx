@@ -96,6 +96,47 @@ export default function App() {
   const [menuCoords, setMenuCoords] = useState({ x: 0, y: 0 });
   const [selectionData, setSelectionData] = useState({ start: 0, end: 0, text: "" });
 
+  // --- AI Time Machine Snapshot State (Option 4) ---
+  const [lastSnapshot, setLastSnapshot] = useState<{ chapterId: string | null; content: string | null }>(() => {
+    try {
+      const saved = localStorage.getItem("ai_story_last_snapshot");
+      return saved ? JSON.parse(saved) : { chapterId: null, content: null };
+    } catch {
+      return { chapterId: null, content: null };
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (lastSnapshot && lastSnapshot.content) {
+        localStorage.setItem("ai_story_last_snapshot", JSON.stringify(lastSnapshot));
+      } else {
+        localStorage.removeItem("ai_story_last_snapshot");
+      }
+    } catch (e) {
+      console.error("Failed to save snapshot to localStorage", e);
+    }
+  }, [lastSnapshot]);
+
+  const handleUndoAiAction = () => {
+    if (!lastSnapshot.content || lastSnapshot.chapterId !== activeChapterId) return;
+
+    setStory((prev) => {
+      const nextChapters = prev.chapters.map((ch) =>
+        ch.id === activeChapterId ? { ...ch, content: lastSnapshot.content! } : ch
+      );
+      return {
+        ...prev,
+        manuscript: lastSnapshot.content!,
+        chapters: nextChapters,
+        lastSavedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+    });
+
+    setLastSnapshot({ chapterId: null, content: null });
+    showNotification("Reverted back to your exact human draft.");
+  };
+
   // New: Inline complete co-writer state & refs
   const [isGenerating, setIsGenerating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -282,6 +323,9 @@ export default function App() {
 
     if (!textBeforeCursor.trim()) return; // Don't invoke if there's no context
 
+    // TIME MACHINE: Snapshot current draft before inline autocomplete
+    setLastSnapshot({ chapterId: activeChapterId, content: activeCh.content });
+
     setIsGenerating(true);
     showNotification("Gemini is composing continuous prose...");
 
@@ -399,6 +443,7 @@ export default function App() {
       };
     });
     setAnalyticsResult(null);
+    setLastSnapshot({ chapterId: null, content: null });
   };
 
   const handleAddNewChapter = () => {
@@ -480,6 +525,10 @@ export default function App() {
   // 2. Core integration: Continue Writing (Predicate text generation)
   const handleContinuousWrite = async () => {
     if (expandingActive) return;
+
+    // TIME MACHINE: Snapshot current draft before continuous expand write
+    setLastSnapshot({ chapterId: activeChapterId, content: activeCh.content });
+
     setExpandingActive(true);
     try {
       const resp = await fetch("/api/gemini/expand", {
@@ -523,6 +572,9 @@ export default function App() {
 
   // 3. Core integration: Apply prose improvement
   const handleApplyRefine = (newProse: string) => {
+    // TIME MACHINE: Snapshot current draft before applying refine improvement
+    setLastSnapshot({ chapterId: activeChapterId, content: activeCh.content });
+
     let nextContent = "";
     if (highlightedText && activeCh.content.includes(highlightedText)) {
       // Replace only the specific subset highlighted
@@ -703,6 +755,10 @@ export default function App() {
   // --- Trigger Selection Transform ---
   const handleTransform = async (mode: 'show' | 'dialogue' | 'action') => {
     if (isGenerating || !selectionData.text) return;
+
+    // TIME MACHINE: Snapshot current draft before inline selection style transforms
+    setLastSnapshot({ chapterId: activeChapterId, content: activeCh.content });
+
     setShowMenu(false);
     setIsGenerating(true);
     showNotification(`Gemini is transforming prose with target style: "${mode}"...`);
@@ -1231,6 +1287,31 @@ export default function App() {
                   </div>
                      {/* Main draft Area */}
                 <div className="flex-1 flex flex-col min-h-[350px] relative">
+                  {/* TIME MACHINE BANNER NOTIFICATION (Option 4) */}
+                  {lastSnapshot.content && lastSnapshot.chapterId === activeChapterId && (
+                    <div className="bg-[#FFFDF4] border border-[#F5E1A4] rounded-xl p-3.5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between text-xs animate-fadeIn shadow-sm gap-3">
+                      <div className="flex items-center gap-2 text-[#855D15]">
+                        <Sparkle className="w-4 h-4 text-[#C19A2E] animate-pulse shrink-0" />
+                        <span>
+                          <strong>AI Time Machine:</strong> An AI co-writing update was applied. If it shifted your style or tone, you can instantly roll back, keeping your voice pristine.
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={handleUndoAiAction}
+                          className="px-3 py-1.5 bg-[#855D15] hover:bg-[#6D4B10] text-[#FFFDF4] font-semibold rounded-lg shadow-xs hover:shadow-sm cursor-pointer transition-colors"
+                        >
+                          ↩️ Revert to Human Draft
+                        </button>
+                        <button
+                          onClick={() => setLastSnapshot({ chapterId: null, content: null })}
+                          className="px-2.5 py-1.5 hover:bg-[#EFECE3] border border-[#DCDAD2] text-[#88887e] hover:text-[#33332d] font-medium rounded-lg cursor-pointer transition-colors"
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {/* Quick select highlights banner */}
                   {highlightedText && (
                     <div className="bg-[#ecece4] px-4 py-2.5 rounded-xl border border-[#dcdcd4] flex items-center justify-between text-xs mb-3 animate-pulse">
