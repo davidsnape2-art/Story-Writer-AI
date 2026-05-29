@@ -857,8 +857,7 @@ export default function App() {
           opacity: 0;
           transition: opacity 0.15s ease-in-out;
         }
-        aside[style*="width: 280px"] .sidebar-content-wrapper,
-        aside[style*="width: 360px"] .sidebar-content-wrapper {
+        aside:not(.w-0) .sidebar-content-wrapper {
           opacity: 1;
           white-space: normal;
         }
@@ -952,6 +951,7 @@ export default function App() {
           <>
             {/* Left Sidebar: Chapters list, Settings, Outlines, Beats */}
             <aside className={`h-full border-r border-[#e5e5df] bg-[#f9f9f5] flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ease-in-out ${isLeftOpen ? 'w-full lg:w-64 p-4' : 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden border-none'}`}>
+              <div className="sidebar-content-wrapper flex-1 flex flex-col h-full min-w-[224px]">
               
               {/* Chapters List (Multi-Chapter Navigation) */}
               <div className="mb-6 bg-white p-4 rounded-xl border border-[#efeee8] shadow-sm">
@@ -1264,6 +1264,7 @@ export default function App() {
                   </form>
                 </div>
               )}
+              </div>
             </aside>
 
             {/* Middle Module: Story writing sheet */}
@@ -1459,6 +1460,7 @@ export default function App() {
 
             {/* Right Sidebar: Side Editorial & Co-writer Panel */}
             <aside className={`h-full border-l border-[#e5e5df] bg-[#f9f9f5] flex flex-col shrink-0 overflow-y-auto transition-all duration-300 ease-in-out ${isRightOpen ? 'w-full lg:w-80 p-4' : 'w-0 opacity-0 pointer-events-none p-0 overflow-hidden border-none'}`}>
+              <div className="sidebar-content-wrapper flex-1 flex flex-col h-full min-w-[288px]">
                 {/* Lore Engine Status Info */}
                 <div className="bg-[#ecece4]/60 p-3 rounded-xl border border-[#dcdcd4] text-xs mb-4 shrink-0">
                   <div className="flex items-center gap-1.5 font-sans font-bold text-[#5A5A40] mb-1">
@@ -1675,7 +1677,8 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              </aside>
+              </div>
+            </aside>
           </>
         )}
 
