@@ -291,10 +291,10 @@ export default function App() {
       const data = await response.json();
       const rawText = data.text || "";
 
-      // Parse the output block sections cleanly using split processing
-      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]:?([\s\S]*?)(?=\[PACING|$)/i);
-      const pacingMatch = rawText.match(/\[PACING REPORT\]:?([\s\S]*?)(?=\[BETA|$)/i);
-      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]:?([\s\S]*?)$/i);
+      // The '\s*' and 'i' flags ensure robust parsing regardless of spacing or casing variations
+      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|$)/i);
+      const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|$)/i);
+      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)$/i);
 
       setAnalyticsResult({
         sensory: sensoryMatch ? sensoryMatch[1].trim() : "Analysis parsing failed for this segment.",
