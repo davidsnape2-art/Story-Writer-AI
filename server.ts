@@ -238,19 +238,29 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
     const ai = getGeminiClient();
 
     const analysisPrompt = `
-You are an expert literary editor, novel design coordinator, and a detail-oriented beta reader. 
-Analyze the following story chapter text comprehensively across three key metrics:
-- Sensory balance check (sight, sound, smell, taste, touch)
-- Pacing flow (scene density, speed, description vs action)
-- Objective beta reader critique (emotional resonance, plot plausibility, character logic)
+  You are a ruthless, highly sought-after literary developmental editor and prose colorist. 
+  Your job is to conduct a clinical diagnostic audit of the text provided below. 
+  Do not offer generic praise or conversational pleasantries. Provide sharp, actionable, mechanical writing critiques.
 
-Provide your analysis strictly broken into three clear blocks using these exact structural tags:
-[SENSORY CHECK]: Evaluate the presence of visceral details. Spot missing senses and explain how to inject them.
-[PACING REPORT]: Pinpoint where the narrative moves too fast, too slow, or drags unnecessarily.
-[BETA READER CRITIQUE]: Provide honest structural observations regarding character motives, credibility, and reader engagement.
+  Analyze the text strictly using the following three diagnostic frameworks:
 
-Here is the chapter text to analyze:
-"${content}"
+  [SENSORY CHECK]
+  - Audit the text for VAKOG (Visual, Auditory, Kinesthetic, Olfactory, Gustatory) distribution.
+  - Diagnose if the scene suffers from "White Room Syndrome" (characters talking in a blank, unrendered void).
+  - Identify the exact lines where sensory details are completely missing, and specify which non-visual sense (sound, texture, scent, taste) would elevate the scene's immersion.
+
+  [PACING REPORT]
+  - Map the narrative velocity. Identify the exact paragraphs where the pacing drags due to over-explanation, unnecessary internal monologue, or redundant exposition.
+  - Pinpoint where the prose rushes through critical emotional or high-tension turning points without letting the moment "breathe."
+  - Provide a clear directive on which sentences to cut, compress, or expand to restore an ideal structural rhythm.
+
+  [BETA READER CRITIQUE]
+  - Evaluate character agency and logic: Are the characters acting on genuine internal motivations, or are they being artificially pushed around by the plot?
+  - Identify "on-the-nose" dialogue where characters are explicitly stating their feelings instead of letting subtext, tension, or body language do the work.
+  - Flag any logical consistency errors or unearned emotional payoffs.
+
+  MANUSCRIPT FOR INVENTORY:
+  "${content}"
 `;
 
     const response = await ai.models.generateContent({
