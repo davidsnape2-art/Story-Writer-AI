@@ -833,6 +833,37 @@ export default function App() {
   return (
     <div id="ai-story-writer-app" className={`min-h-screen bg-[#f5f5f0] text-[#33332d] font-sans flex flex-col justify-between overflow-x-hidden transition-all ${focusMode ? "pt-0" : ""}`}>
       
+      {/* Global CSS Overrides for Scrollbars and Animations */}
+      <style>{`
+        /* Custom Minimalist Scrollbars */
+        ::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+          background: #141414;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: #3a3a3c;
+          border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: #48484a;
+        }
+
+        /* Prevent sidebar text from awkwardly wrapping or snapping during collapse animation */
+        .sidebar-content-wrapper {
+          white-space: nowrap;
+          opacity: 0;
+          transition: opacity 0.15s ease-in-out;
+        }
+        aside[style*="width: 280px"] .sidebar-content-wrapper,
+        aside[style*="width: 360px"] .sidebar-content-wrapper {
+          opacity: 1;
+          white-space: normal;
+        }
+      `}</style>
+
       {/* ⚠️ Notifications Toast Panel */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {notifications.map((note, idx) => (
