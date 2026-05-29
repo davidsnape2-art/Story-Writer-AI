@@ -1760,3 +1760,84 @@ export default function App() {
     </div>
   );
 }
+
+const styles = {
+  // Triple-Tonal Workspace Palette
+  workspaceContainer: { 
+    display: 'flex', 
+    width: '100vw', 
+    height: '100vh', 
+    backgroundColor: '#0a0a0a', // True pitch background drop
+    color: '#e5e5ea', 
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', 
+    overflow: 'hidden' 
+  },
+  
+  // Premium Cubic-Bezier Timing Sidebar
+  sidebar: { 
+    height: '100%', 
+    // This cubic-bezier profile gives an elegant, accelerating snap outward
+    transition: 'width 0.3s cubic-bezier(0.25, 1, 0.5, 1)', 
+    overflow: 'hidden', 
+    backgroundColor: '#141414', // Slightly elevated sidebar dark
+    display: 'flex', 
+    flexDirection: 'column' 
+  },
+  leftSidebar: { borderRight: '1px solid #222224' },
+  rightSidebar: { borderLeft: '1px solid #222224' },
+  
+  sidebarContent: { 
+    width: '100%', 
+    height: '100%', 
+    padding: '24px 20px', 
+    boxSizing: 'border-box', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    minWidth: '240px' 
+  },
+  sidebarTitle: { margin: '0 0 16px 0', fontSize: '11px', fontWeight: '700', color: '#636366', textTransform: 'uppercase', letterSpacing: '1.5px' },
+  
+  docList: { listStyleType: 'none', padding: 0, margin: '0 0 15px 0', flexShrink: 0 },
+  docItem: { padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', marginBottom: '6px', fontSize: '13px', fontWeight: '500', transition: 'background-color 0.15s, color 0.15s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  divider: { border: 'none', borderTop: '1px solid #222224', margin: '5px 0 20px 0' },
+  
+  // Lore Ledger Cards
+  loreContainer: { flexGrow: 1, overflowY: 'auto', marginBottom: '15px', paddingRight: '4px' },
+  loreCard: { backgroundColor: '#1c1c1e', borderRadius: '8px', padding: '12px', marginBottom: '10px', border: '1px solid #2c2c2e', transition: 'border-color 0.2s' },
+  loreCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: '#fff', fontWeight: '600' },
+  deleteLoreBtn: { background: 'transparent', border: 'none', color: '#48484a', cursor: 'pointer', fontSize: '16px', transition: 'color 0.2s' },
+  loreCardDesc: { margin: 0, fontSize: '12px', color: '#9a9a9f', lineHeight: '1.5', marginTop: '6px' },
+  
+  loreForm: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  loreInput: { backgroundColor: '#0a0a0a', border: '1px solid #2c2c2e', borderRadius: '6px', color: '#fff', padding: '8px 12px', fontSize: '13px', outline: 'none', transition: 'border-color 0.2s' },
+  addLoreBtn: { backgroundColor: '#2c2c2e', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px', fontSize: '13px', cursor: 'pointer', fontWeight: '600', transition: 'background-color 0.2s' },
+  
+  // Center Stage Focus Canvas
+  mainCanvas: { flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#0e0e10' },
+  canvasHeader: { display: 'flex', alignItems: 'center', justify: 'space-between', padding: '14px 24px', borderBottom: '1px solid #1c1c1e', backgroundColor: '#0e0e10' },
+  titleInput: { background: 'transparent', border: 'none', color: '#fff', fontSize: '16px', fontWeight: '600', textAlign: 'center', outline: 'none', flexGrow: 1, letterSpacing: '-0.5px' },
+  toggleBtn: { background: '#1c1c1e', border: 'none', color: '#aeaeae', padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'background-color 0.2s, color 0.2s' },
+  
+  editorWrapper: { flexGrow: 1, padding: '40px 80px', display: 'flex', justifyContent: 'center', position: 'relative', overflowY: 'auto' },
+  textarea: { width: '100%', maxWidth: '720px', height: '100%', background: 'transparent', border: 'none', resize: 'none', outline: 'none', color: '#e5e5ea', fontSize: '18px', lineHeight: '1.65', fontFamily: '"Georgia", serif', caretColor: '#007aff' },
+  
+  // Context Overlays
+  floatingMenu: { position: 'fixed', display: 'flex', backgroundColor: '#1c1c1e', border: '1px solid #3a3a3c', borderRadius: '12px', padding: '6px', zIndex: 1000, transform: 'translateX(-50%)', gap: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' },
+  menuBtn: { background: 'transparent', border: 'none', color: '#fff', padding: '6px 12px', fontSize: '12px', fontWeight: '500', borderRadius: '6px', cursor: 'pointer', transition: 'background-color 0.15s' },
+  aiStatusBubble: { position: 'absolute', bottom: '40px', right: '40px', backgroundColor: '#007aff', color: '#fff', padding: '10px 20px', borderRadius: '30px', fontSize: '13px', fontWeight: '600', boxShadow: '0 4px 16px rgba(0,122,255,0.4)' },
+
+  // Editorial Metrics Analytics Layout
+  analyzeBtn: { backgroundColor: '#007aff', color: '#fff', border: 'none', borderRadius: '8px', padding: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', width: '100%', marginBottom: '20px', transition: 'background-color 0.2s, opacity 0.2s' },
+  dashboardResults: { flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' },
+  dashboardPlaceholder: { flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', color: '#48484a', fontSize: '13px', padding: '0 20px', lineHeight: '1.6' },
+  metricSection: { backgroundColor: '#1c1c1e', border: '1px solid #2c2c2e', borderRadius: '8px', padding: '16px' },
+  metricTitle: { margin: '0 0 10px 0', fontSize: '13px', color: '#fff', fontWeight: '600', letterSpacing: '-0.2px' },
+  metricBody: { margin: 0, fontSize: '13px', color: '#aeaeb2', lineHeight: '1.6', whiteSpace: 'pre-wrap' },
+
+  // Time Machine Revision Control Alert Banner
+  timeMachineBanner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1c1c1e', borderBottom: '1px solid #ff9500', padding: '12px 24px', transition: 'all 0.3s ease' },
+  bannerText: { fontSize: '13px', color: '#ff9500', fontWeight: '600', letterSpacing: '-0.1px' },
+  bannerActions: { display: 'flex', gap: '12px' },
+  undoBtn: { backgroundColor: '#ff9500', color: '#000', border: 'none', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'opacity 0.15s' },
+  dismissBtn: { backgroundColor: 'transparent', border: '1px solid #3a3a3c', color: '#aeaeb2', borderRadius: '6px', padding: '6px 14px', fontSize: '12px', cursor: 'pointer', transition: 'background-color 0.15s, color 0.15s' }
+};
