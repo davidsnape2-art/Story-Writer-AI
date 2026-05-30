@@ -260,7 +260,9 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
   - Flag any logical consistency errors or unearned emotional payoffs.
 
   MANUSCRIPT FOR INVENTORY:
-  "${content}"
+  """
+  ${content}
+  """
 `;
 
     const response = await ai.models.generateContent({

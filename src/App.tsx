@@ -285,7 +285,14 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+        let serverError = `API error: ${response.status} ${response.statusText}`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            serverError = errData.error;
+          }
+        } catch (_) {}
+        throw new Error(serverError);
       }
 
       const data = await response.json();
