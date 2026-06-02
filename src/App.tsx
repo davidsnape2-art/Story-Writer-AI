@@ -663,6 +663,20 @@ export default function App() {
     showNotification(`${newChar.name} added!`);
   };
 
+  // Delete character from Bible
+  const handleDeleteCharacter = (charId: string) => {
+    setStory((prev) => {
+      const charToDelete = prev.characters.find(c => c.id === charId);
+      const name = charToDelete ? charToDelete.name : "Character";
+      const updated = prev.characters.filter((c) => c.id !== charId);
+      setTimeout(() => showNotification(`${name} removed.`), 50);
+      return {
+        ...prev,
+        characters: updated,
+      };
+    });
+  };
+
   // Active state handlers for story data
   const handleAddOutlineItem = () => {
     const newItem: OutlineItem = {
@@ -1738,6 +1752,7 @@ export default function App() {
               <CharacterTab
                 characters={story.characters}
                 onAddCharacter={handleAddCharacter}
+                onDeleteCharacter={handleDeleteCharacter}
                 onSelectCharacterForCanvas={handleInsertCharacterSnippet}
               />
             </div>

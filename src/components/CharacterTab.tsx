@@ -4,16 +4,17 @@
  */
 
 import React, { useState } from "react";
-import { Users, UserPlus, Sparkles, RefreshCw, Eye, Award, Link, History, ShieldAlert } from "lucide-react";
+import { Users, UserPlus, Sparkles, RefreshCw, Eye, Award, Link, History, ShieldAlert, Trash2 } from "lucide-react";
 import { Character } from "../types";
 
 interface CharacterTabProps {
   characters: Character[];
   onAddCharacter: (char: Character) => void;
+  onDeleteCharacter?: (charId: string) => void;
   onSelectCharacterForCanvas?: (char: Character) => void;
 }
 
-export default function CharacterTab({ characters, onAddCharacter, onSelectCharacterForCanvas }: CharacterTabProps) {
+export default function CharacterTab({ characters, onAddCharacter, onDeleteCharacter, onSelectCharacterForCanvas }: CharacterTabProps) {
   const [name, setName] = useState("");
   const [archetype, setArchetype] = useState("Profound Martyr");
   const [description, setDescription] = useState("");
@@ -146,18 +147,33 @@ export default function CharacterTab({ characters, onAddCharacter, onSelectChara
                 className="bg-[#fcfcf9] rounded-xl border border-[#e5e5df] p-6 hover:border-[#5A5A40]/40 transition-all flex flex-col justify-between shadow-sm relative overflow-hidden group"
               >
                 <div>
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className={`w-10 h-10 rounded-full ${colorClass} text-white flex items-center justify-center font-display font-semibold text-sm shadow-inner`}>
-                      {char.name?.split(" ").map(w => w[0]).join("") || "?"}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-full ${colorClass} text-white flex items-center justify-center font-display font-semibold text-sm shadow-inner shrink-0`}>
+                        {char.name?.split(" ").map(w => w[0]).join("") || "?"}
+                      </div>
+                      <div>
+                        <h4 className="font-display font-bold text-base text-[#1a1a15] flex items-center gap-1.5">
+                          {char.name}
+                        </h4>
+                        <p className="font-sans text-[10px] uppercase font-bold text-[#5A5A40] tracking-wider">
+                          {char.archetype || "Archetype Unspecified"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-display font-bold text-base text-[#1a1a15] flex items-center gap-1.5">
-                        {char.name}
-                      </h4>
-                      <p className="font-sans text-[10px] uppercase font-bold text-[#5A5A40] tracking-wider">
-                        {char.archetype || "Archetype Unspecified"}
-                      </p>
-                    </div>
+                    {onDeleteCharacter && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to delete ${char.name} from the Character Bible?`)) {
+                            onDeleteCharacter(char.id);
+                          }
+                        }}
+                        className="p-1.5 text-[#a1a19a] hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                        title={`Delete ${char.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
 
                   <p className="font-serif text-[12.5px] italic text-[#5A5A40] leading-snug mb-4 border-l-2 border-[#5A5A40]/20 pl-3">
