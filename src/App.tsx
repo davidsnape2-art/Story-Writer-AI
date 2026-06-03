@@ -79,8 +79,12 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyticsResult, setAnalyticsResult] = useState<{
     sensory: string;
+    sensoryScore?: number;
     pacing: string;
+    pacingScore?: number;
     beta: string;
+    betaScore?: number;
+    overallScore?: number;
   } | null>(() => {
     try {
       const saved = localStorage.getItem("ai_story_analytics");
@@ -298,15 +302,26 @@ export default function App() {
       const data = await response.json();
       const rawText = data.text || "";
 
-      // The '\s*' and 'i' flags ensure robust parsing regardless of spacing or casing variations
-      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|$)/i);
-      const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|$)/i);
-      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)$/i);
+      // Precise extracting considering score tags so they don't pollute the textual summaries
+      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|$)/i);
+      const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|$)/i);
+      // Clean parsing for BETA block so the score tags at the very bottom are not included in the beta block
+      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)(?=\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|$)/i);
+
+      // Regex matches to pull numerical scores
+      const sensoryScoreMatch = rawText.match(/\[SENSORY SCORE\]\s*(\d+)/i);
+      const pacingScoreMatch = rawText.match(/\[PACING SCORE\]\s*(\d+)/i);
+      const betaScoreMatch = rawText.match(/\[BETA SCORE\]\s*(\d+)/i);
+      const overallScoreMatch = rawText.match(/\[OVERALL SCORE\]\s*(\d+)/i);
 
       setAnalyticsResult({
         sensory: sensoryMatch ? sensoryMatch[1].trim() : "Analysis parsing failed for this segment.",
+        sensoryScore: sensoryScoreMatch ? parseInt(sensoryScoreMatch[1], 10) : undefined,
         pacing: pacingMatch ? pacingMatch[1].trim() : "Analysis parsing failed for this segment.",
-        beta: betaMatch ? betaMatch[1].trim() : rawText // Fallback to raw response if structure broke
+        pacingScore: pacingScoreMatch ? parseInt(pacingScoreMatch[1], 10) : undefined,
+        beta: betaMatch ? betaMatch[1].trim() : (rawText.split(/\[BETA READER CRITIQUE\]/i)[1] || rawText).trim(),
+        betaScore: betaScoreMatch ? parseInt(betaScoreMatch[1], 10) : undefined,
+        overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : undefined,
       });
 
       showNotification("Chapter analysis loaded successfully!");
@@ -1656,28 +1671,130 @@ export default function App() {
                       <div className="space-y-3">
                         {analyticsResult ? (
                           <>
+                            {analyticsResult.overallScore !== undefined && (
+                              <div className="bg-[#fbfbf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs text-center space-y-3 animate-fade-in">
+                                <div className="font-sans font-bold text-[9px] text-[#5A5A40] uppercase tracking-widest block">
+                                  ✒️ Overall Quality Grade
+                                </div>
+                                <div className="flex justify-center items-center gap-4">
+                                  <div className="relative flex items-center justify-center shrink-0">
+                                    <svg className="w-14 h-14 transform -rotate-90">
+                                      <circle
+                                        cx="28"
+                                        cy="28"
+                                        r="24"
+                                        className="stroke-current text-gray-200 fill-none"
+                                        strokeWidth="4.5"
+                                      />
+                                      <circle
+                                        cx="28"
+                                        cy="28"
+                                        r="24"
+                                        className={`stroke-current ${analyticsResult.overallScore >= 80 ? "text-emerald-600" : analyticsResult.overallScore >= 60 ? "text-amber-500" : "text-rose-500"} fill-none`}
+                                        strokeWidth="4.5"
+                                        strokeDasharray={150.8}
+                                        strokeDashoffset={150.8 - (150.8 * analyticsResult.overallScore) / 100}
+                                        strokeLinecap="round"
+                                        style={{ transition: "stroke-dashoffset 1s ease-in-out" }}
+                                      />
+                                    </svg>
+                                    <div className="absolute text-center flex flex-col items-center justify-center">
+                                      <span className="font-display font-black text-xs text-[#1a1a15]">
+                                        {(analyticsResult.overallScore / 10).toFixed(1)}
+                                      </span>
+                                      <span className="text-[8px] text-[#7c7c72] leading-none">/10</span>
+                                    </div>
+                                  </div>
+                                  <div className="text-left space-y-0.5">
+                                    <div className="text-sm font-display font-extrabold text-[#1a1a15]">
+                                      {analyticsResult.overallScore}% Quality Index
+                                    </div>
+                                    <p className="text-[9.5px] text-[#7c7c72] leading-snug">
+                                      Expert score based on sensory depth, pacing velocity, and alignment.
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 pt-2 border-t border-[#f0efe9]">
+                                  <div className="text-center">
+                                    <span className="text-[8px] text-[#7c7c72] uppercase font-bold block tracking-tight">Sensory</span>
+                                    <span className="text-[11px] font-mono font-bold text-[#33332d]">
+                                      {analyticsResult.sensoryScore !== undefined ? `${analyticsResult.sensoryScore}%` : "—"}
+                                    </span>
+                                  </div>
+                                  <div className="border-x border-[#f0efe9] text-center">
+                                    <span className="text-[8px] text-[#7c7c72] uppercase font-bold block tracking-tight">Pacing</span>
+                                    <span className="text-[11px] font-mono font-bold text-[#33332d]">
+                                      {analyticsResult.pacingScore !== undefined ? `${analyticsResult.pacingScore}%` : "—"}
+                                    </span>
+                                  </div>
+                                  <div className="text-center">
+                                    <span className="text-[8px] text-[#7c7c72] uppercase font-bold block tracking-tight">Beta</span>
+                                    <span className="text-[11px] font-mono font-bold text-[#33332d]">
+                                      {analyticsResult.betaScore !== undefined ? `${analyticsResult.betaScore}%` : "—"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
-                              <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider mb-2">
-                                👃 Sensory Balance Check
-                              </h5>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider">
+                                  👃 Sensory Balance Check
+                                </h5>
+                                {analyticsResult.sensoryScore !== undefined && (
+                                  <div className={`px-2 py-0.5 rounded-md border text-[10px] font-mono font-extrabold ${analyticsResult.sensoryScore >= 80 ? "text-emerald-700 bg-emerald-50 border-emerald-100" : analyticsResult.sensoryScore >= 60 ? "text-amber-700 bg-amber-50 border-amber-100" : "text-rose-700 bg-rose-50 border-rose-100"}`}>
+                                    {(analyticsResult.sensoryScore / 10).toFixed(1)}/10 ({analyticsResult.sensoryScore}%)
+                                  </div>
+                                )}
+                              </div>
+                              {analyticsResult.sensoryScore !== undefined && (
+                                <div className="w-full bg-[#f0efe9] h-1 rounded-full overflow-hidden mb-3">
+                                  <div className={`h-full ${analyticsResult.sensoryScore >= 80 ? "bg-emerald-600" : analyticsResult.sensoryScore >= 60 ? "bg-amber-500" : "bg-rose-500"} transition-all duration-500`} style={{ width: `${analyticsResult.sensoryScore}%` }}></div>
+                                </div>
+                              )}
                               <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
                                 {analyticsResult.sensory}
                               </p>
                             </div>
 
                             <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
-                              <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider mb-2">
-                                ⏱️ Pacing Report
-                              </h5>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider">
+                                  ⏱️ Pacing Report
+                                </h5>
+                                {analyticsResult.pacingScore !== undefined && (
+                                  <div className={`px-2 py-0.5 rounded-md border text-[10px] font-mono font-extrabold ${analyticsResult.pacingScore >= 80 ? "text-emerald-700 bg-emerald-50 border-emerald-100" : analyticsResult.pacingScore >= 60 ? "text-amber-700 bg-amber-50 border-amber-100" : "text-rose-700 bg-rose-50 border-rose-100"}`}>
+                                    {(analyticsResult.pacingScore / 10).toFixed(1)}/10 ({analyticsResult.pacingScore}%)
+                                  </div>
+                                )}
+                              </div>
+                              {analyticsResult.pacingScore !== undefined && (
+                                <div className="w-full bg-[#f0efe9] h-1 rounded-full overflow-hidden mb-3">
+                                  <div className={`h-full ${analyticsResult.pacingScore >= 80 ? "bg-emerald-600" : analyticsResult.pacingScore >= 60 ? "bg-amber-500" : "bg-rose-500"} transition-all duration-500`} style={{ width: `${analyticsResult.pacingScore}%` }}></div>
+                                </div>
+                              )}
                               <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
                                 {analyticsResult.pacing}
                               </p>
                             </div>
 
                             <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
-                              <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider mb-2">
-                                🕵️ Beta Reader Critique
-                              </h5>
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider">
+                                  🕵️ Beta Reader Critique
+                                </h5>
+                                {analyticsResult.betaScore !== undefined && (
+                                  <div className={`px-2 py-0.5 rounded-md border text-[10px] font-mono font-extrabold ${analyticsResult.betaScore >= 80 ? "text-emerald-700 bg-emerald-50 border-emerald-100" : analyticsResult.betaScore >= 60 ? "text-amber-700 bg-amber-50 border-amber-100" : "text-rose-700 bg-rose-50 border-rose-100"}`}>
+                                    {(analyticsResult.betaScore / 10).toFixed(1)}/10 ({analyticsResult.betaScore}%)
+                                  </div>
+                                )}
+                              </div>
+                              {analyticsResult.betaScore !== undefined && (
+                                <div className="w-full bg-[#f0efe9] h-1 rounded-full overflow-hidden mb-3">
+                                  <div className={`h-full ${analyticsResult.betaScore >= 80 ? "bg-emerald-600" : analyticsResult.betaScore >= 60 ? "bg-amber-500" : "bg-rose-500"} transition-all duration-500`} style={{ width: `${analyticsResult.betaScore}%` }}></div>
+                                </div>
+                              )}
                               <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
                                 {analyticsResult.beta}
                               </p>

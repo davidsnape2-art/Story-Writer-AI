@@ -259,6 +259,12 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
   - Identify "on-the-nose" dialogue where characters are explicitly stating their feelings instead of letting subtext, tension, or body language do the work.
   - Flag any logical consistency errors or unearned emotional payoffs.
 
+  Additionally, calculate numeric grades (0 to 100) assessing each framework's quality level, as well as an overall manuscript quality grade. Put these grades strictly in these exact headers at the end of your response:
+  [SENSORY SCORE] <number from 0 to 100>
+  [PACING SCORE] <number from 0 to 100>
+  [BETA SCORE] <number from 0 to 100>
+  [OVERALL SCORE] <number from 0 to 100>
+
   MANUSCRIPT FOR INVENTORY:
   """
   ${content}
