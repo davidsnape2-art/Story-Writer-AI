@@ -303,18 +303,34 @@ export default function App() {
       const rawText = data.text || "";
 
       // Precise extracting considering score tags so they don't pollute the textual summaries
-      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|$)/i);
-      const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|$)/i);
+      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
+      const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
       // Clean parsing for BETA block so the score tags at the very bottom are not included in the beta block
-      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)(?=\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|$)/i);
+      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)(?=\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
 
       // Regex matches to pull numerical scores
       const sensoryScoreMatch = rawText.match(/\[SENSORY SCORE\]\s*(\d+)/i);
       const pacingScoreMatch = rawText.match(/\[PACING SCORE\]\s*(\d+)/i);
       const betaScoreMatch = rawText.match(/\[BETA SCORE\]\s*(\d+)/i);
       const overallScoreMatch = rawText.match(/\[OVERALL SCORE\]\s*(\d+)/i);
+      const pacingCategoryMatch = rawText.match(/\[PACING CATEGORY\]\s*([^\[\n\r]+)/i);
 
-      setAnalyticsResult({
+      const rawCategory = pacingCategoryMatch ? pacingCategoryMatch[1].trim() : "Steady Pacing";
+      const scoreMapping: Record<string, number> = {
+        "Flat / Static": 1,
+        "Slow Burn": 2,
+        "Steady Pacing": 3,
+        "Highly Engaging": 4,
+        "Breakneck / Intense": 5
+      };
+
+      const matchedKey = Object.keys(scoreMapping).find(
+        key => key.toLowerCase() === rawCategory.replace(/['"“”]/g, "").trim().toLowerCase()
+      ) || "Steady Pacing";
+
+      const pacingValue = scoreMapping[matchedKey];
+
+      const newAnalyticsResult = {
         sensory: sensoryMatch ? sensoryMatch[1].trim() : "Analysis parsing failed for this segment.",
         sensoryScore: sensoryScoreMatch ? parseInt(sensoryScoreMatch[1], 10) : undefined,
         pacing: pacingMatch ? pacingMatch[1].trim() : "Analysis parsing failed for this segment.",
@@ -322,6 +338,20 @@ export default function App() {
         beta: betaMatch ? betaMatch[1].trim() : (rawText.split(/\[BETA READER CRITIQUE\]/i)[1] || rawText).trim(),
         betaScore: betaScoreMatch ? parseInt(betaScoreMatch[1], 10) : undefined,
         overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : undefined,
+        pacingCategory: matchedKey,
+        pacingValue: pacingValue,
+      };
+
+      setAnalyticsResult(newAnalyticsResult);
+
+      setStory((prev) => {
+        const nextChapters = prev.chapters.map((ch) =>
+          ch.id === activeChapterId ? { ...ch, analytics: newAnalyticsResult } : ch
+        );
+        return {
+          ...prev,
+          chapters: nextChapters,
+        };
       });
 
       showNotification("Chapter analysis loaded successfully!");
@@ -456,15 +486,15 @@ export default function App() {
   };
 
   const handleSelectChapter = (chapterId: string) => {
+    const selectedCh = story.chapters.find((ch) => ch.id === chapterId);
     setStory((prev) => {
-      const selectedCh = prev.chapters.find((ch) => ch.id === chapterId);
       return {
         ...prev,
         activeChapterId: chapterId,
         manuscript: selectedCh ? selectedCh.content : prev.manuscript,
       };
     });
-    setAnalyticsResult(null);
+    setAnalyticsResult(selectedCh?.analytics || null);
     setLastSnapshot({ chapterId: null, content: null });
   };
 
@@ -1004,28 +1034,40 @@ export default function App() {
                   </button>
                 </div>
                 <ul className="space-y-1 max-h-48 overflow-y-auto">
-                  {story.chapters.map((ch) => (
-                    <li
-                      key={ch.id}
-                      onClick={() => handleSelectChapter(ch.id)}
-                      className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-xs font-sans transition-all duration-150 ${
-                        ch.id === activeChapterId
-                          ? "bg-[#5A5A40] text-white shadow-sm font-medium"
-                          : "text-[#555] hover:bg-[#efeee8] hover:text-[#111]"
-                      }`}
-                    >
-                      <span className="truncate flex-1">📝 {ch.title}</span>
-                      {story.chapters.length > 1 && (
-                        <button
-                          onClick={(e) => handleDeleteChapter(ch.id, e)}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 text-red-500 transition-opacity ml-1"
-                          title="Delete Chapter"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </li>
-                  ))}
+                   {story.chapters.map((ch) => {
+                    const chPacingVal = ch.analytics?.pacingValue;
+                    const chOverallScore = ch.analytics?.overallScore;
+                    return (
+                      <li
+                        key={ch.id}
+                        onClick={() => handleSelectChapter(ch.id)}
+                        className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-xs font-sans transition-all duration-150 ${
+                          ch.id === activeChapterId
+                            ? "bg-[#5A5A40] text-white shadow-sm font-medium"
+                            : "text-[#555] hover:bg-[#efeee8] hover:text-[#111]"
+                        }`}
+                      >
+                        <div className="flex-1 truncate pr-1 flex flex-col min-w-0">
+                          <span className="truncate">📝 {ch.title}</span>
+                          {(chOverallScore !== undefined || chPacingVal !== undefined) && (
+                            <span className={`text-[9px] font-mono leading-tight mt-0.5 ${ch.id === activeChapterId ? "text-white/80" : "text-[#88887e]"}`}>
+                              {chOverallScore !== undefined ? `Score: ${chOverallScore}%` : ""}
+                              {chPacingVal !== undefined ? ` • Pacing: ${chPacingVal}/5` : ""}
+                            </span>
+                          )}
+                        </div>
+                        {story.chapters.length > 1 && (
+                          <button
+                            onClick={(e) => handleDeleteChapter(ch.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 text-red-500 transition-opacity ml-1 shrink-0"
+                            title="Delete Chapter"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
                 <div className="text-[9px] text-[#88887e] italic text-center mt-2 font-mono">
                   Ctrl + B to collapse
@@ -1758,8 +1800,8 @@ export default function App() {
                               </p>
                             </div>
 
-                            <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs">
-                              <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="bg-[#fcfcf9] border border-[#e5e5df] rounded-xl p-4 shadow-xs space-y-3">
+                              <div className="flex items-center justify-between gap-2">
                                 <h5 className="flex items-center gap-1.5 font-sans font-bold text-[10px] text-[#5A5A40] uppercase tracking-wider">
                                   ⏱️ Pacing Report
                                 </h5>
@@ -1770,10 +1812,40 @@ export default function App() {
                                 )}
                               </div>
                               {analyticsResult.pacingScore !== undefined && (
-                                <div className="w-full bg-[#f0efe9] h-1 rounded-full overflow-hidden mb-3">
+                                <div className="w-full bg-[#f0efe9] h-1 rounded-full overflow-hidden">
                                   <div className={`h-full ${analyticsResult.pacingScore >= 80 ? "bg-emerald-600" : analyticsResult.pacingScore >= 60 ? "bg-amber-500" : "bg-rose-500"} transition-all duration-500`} style={{ width: `${analyticsResult.pacingScore}%` }}></div>
                                 </div>
                               )}
+
+                              {analyticsResult.pacingCategory && (
+                                <div className="bg-white p-3 rounded-lg border border-[#efeee8] flex flex-col gap-2">
+                                  <div className="flex items-center justify-between text-xs font-sans">
+                                    <span className="text-[#88887e] font-medium">Narrative Velocity:</span>
+                                    <span className="font-mono font-bold text-[#5A5A40] flex items-center gap-1">
+                                      ⚡ {analyticsResult.pacingCategory} ({analyticsResult.pacingValue}/5)
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-5 gap-1 pt-1">
+                                    {[1, 2, 3, 4, 5].map((val) => {
+                                      const labelMap: Record<number, string> = {
+                                        1: "Static",
+                                        2: "Slow",
+                                        3: "Steady",
+                                        4: "Engaging",
+                                        5: "Intense"
+                                      };
+                                      const isActive = analyticsResult.pacingValue === val;
+                                      return (
+                                        <div key={val} className="text-center space-y-1">
+                                          <div className={`h-1.5 rounded-full ${isActive ? "bg-[#5A5A40]" : "bg-gray-200"}`}></div>
+                                          <span className={`text-[8px] block truncate tracking-tight font-sans ${isActive ? "font-bold text-[#5A5A40]" : "text-[#a1a19a]"}`}>{labelMap[val]}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
                               <p className="text-xs text-[#44443d] leading-relaxed whitespace-pre-line bg-white p-3 rounded-lg border border-[#efeee8]">
                                 {analyticsResult.pacing}
                               </p>

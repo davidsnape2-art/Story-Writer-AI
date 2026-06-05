@@ -259,11 +259,14 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
   - Identify "on-the-nose" dialogue where characters are explicitly stating their feelings instead of letting subtext, tension, or body language do the work.
   - Flag any logical consistency errors or unearned emotional payoffs.
 
-  Additionally, calculate numeric grades (0 to 100) assessing each framework's quality level, as well as an overall manuscript quality grade. Put these grades strictly in these exact headers at the end of your response:
+  Additionally, calculate numeric grades (0 to 100) assessing each framework's quality level, as well as an overall manuscript quality grade.
+  Also, select the precise pacing category that describes the current manuscript from one of these exact values: "Flat / Static", "Slow Burn", "Steady Pacing", "Highly Engaging", or "Breakneck / Intense".
+  Put these grades and the selected category strictly in these exact headers at the end of your response:
   [SENSORY SCORE] <number from 0 to 100>
   [PACING SCORE] <number from 0 to 100>
   [BETA SCORE] <number from 0 to 100>
   [OVERALL SCORE] <number from 0 to 100>
+  [PACING CATEGORY] <one of the exact values listed above>
 
   MANUSCRIPT FOR INVENTORY:
   """
@@ -272,11 +275,11 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: analysisPrompt,
       config: {
         systemInstruction: "You are an award-winning creative writing instructor and structural book critique partner. Provide helpful, precise, objective, and constructive advice without generic praise. Focus purely on literary enhancements.",
-        temperature: 0.75,
+        temperature: 0.0,
       },
     });
 

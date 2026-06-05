@@ -39,6 +39,17 @@ export interface Document {
   id: string;
   title: string;
   content: string;
+  analytics?: {
+    sensory: string;
+    sensoryScore?: number;
+    pacing: string;
+    pacingScore?: number;
+    beta: string;
+    betaScore?: number;
+    overallScore?: number;
+    pacingCategory?: string;
+    pacingValue?: number;
+  };
 }
 
 export interface ChatMessage {
