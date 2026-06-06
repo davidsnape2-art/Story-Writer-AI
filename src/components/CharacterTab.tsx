@@ -16,23 +16,12 @@ interface CharacterTabProps {
 
 export default function CharacterTab({ characters, onAddCharacter, onDeleteCharacter, onSelectCharacterForCanvas }: CharacterTabProps) {
   const [name, setName] = useState("");
-  const [archetype, setArchetype] = useState("Profound Martyr");
   const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"index" | "suggest">("index");
   const [previewChar, setPreviewChar] = useState<Partial<Character> | null>(null);
-
-  const archetypes = [
-    "The Reluctant Catalyst",
-    "The Cynical Mentor",
-    "The Blind Visionary",
-    "The Penitent Outlaw",
-    "The Obsessive Curator",
-    "The Cosmic Stray",
-    "The Gentle Saboteur"
-  ];
 
   const handleSuggest = async () => {
     setLoading(true);
@@ -43,7 +32,6 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name || "Lyra Woodsen",
-          archetype: archetype || "The Outcast Healer",
           role: role || "",
           description: description || "A quiet woman traveling alone through dangerous borders, seeking a key that doesn't fit any known locks.",
         }),
@@ -61,7 +49,7 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
       // Convert server format if arrays came down
       const characterPayload: Partial<Character> = {
         name: data.name || "Lyra Woodsen",
-        archetype: data.archetype || archetype,
+        archetype: data.archetype || "",
         role: data.role || role || "",
         tagline: data.tagline || "Walking in silence between forgotten border gates.",
         physicalAppearance: data.physicalAppearance || "Slender build, dark linen hood, calloused hands smelling of wild juniper.",
@@ -85,7 +73,7 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
     const finalChar: Character = {
       id: "char-" + Date.now(),
       name: previewChar.name || "Unnamed Figure",
-      archetype: previewChar.archetype || "Unknown",
+      archetype: previewChar.archetype || "",
       role: previewChar.role || "",
       tagline: previewChar.tagline || "",
       physicalAppearance: previewChar.physicalAppearance || "",
@@ -162,11 +150,8 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
                           {char.name}
                         </h4>
                         <div className="flex flex-col gap-0.5">
-                          <p className="font-sans text-[10px] uppercase font-bold text-[#5A5A40] tracking-wider">
-                            {char.archetype || "Archetype Unspecified"}
-                          </p>
                           {char.role && (
-                            <p className="font-sans text-[10.5px] font-semibold text-[#666657]">
+                            <p className="font-sans text-[11px] font-semibold text-[#5A5A40]">
                               Role: {char.role}
                             </p>
                           )}
@@ -291,23 +276,6 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
 
                 <div>
                   <label className="block font-sans text-[9px] font-bold uppercase tracking-wider text-[#88887e] mb-1">
-                    Core Role / Archetype
-                  </label>
-                  <select
-                    value={archetype}
-                    onChange={(e) => setArchetype(e.target.value)}
-                    className="w-full text-xs font-sans rounded-lg border border-[#d5d5cd] bg-white p-2 text-[#33332d] focus:outline-none focus:border-[#5A5A40] transition-all"
-                  >
-                    {archetypes.map((arch) => (
-                      <option key={arch} value={arch}>
-                        {arch}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-sans text-[9px] font-bold uppercase tracking-wider text-[#88887e] mb-1">
                     Story Role & Narrative Purpose
                   </label>
                   <input
@@ -391,9 +359,8 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
                       <div>
                         <h4 className="font-display font-bold text-base text-[#1a1a15]">{previewChar.name}</h4>
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-sans text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider">{previewChar.archetype}</span>
                           {previewChar.role && (
-                            <span className="font-sans text-[10.5px] font-semibold text-[#666657]">Role: {previewChar.role}</span>
+                            <span className="font-sans text-[11px] font-semibold text-[#5A5A40]">Role: {previewChar.role}</span>
                           )}
                         </div>
                       </div>

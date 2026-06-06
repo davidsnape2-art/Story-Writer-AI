@@ -6,7 +6,7 @@
 export interface Character {
   id: string;
   name: string;
-  archetype: string;
+  archetype?: string;
   role?: string;
   tagline: string;
   physicalAppearance: string;
