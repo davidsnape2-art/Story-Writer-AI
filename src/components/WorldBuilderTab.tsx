@@ -3,9 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
-import { Globe, MapPin, Landmark, Sparkles, RefreshCw, Compass, Users } from "lucide-react";
-import { GENRES } from "../data";
+import React, { useState, useEffect } from "react";
+import { Globe, MapPin, Landmark, Sparkles, RefreshCw, Compass, Users, Trash2 } from "lucide-react";
 
 interface WorldLocation {
   name: string;
@@ -32,38 +31,65 @@ interface FictionalWorld {
 }
 
 export default function WorldBuilderTab() {
-  const [genre, setGenre] = useState(GENRES[2] || "Fantasy"); // high fantasy
   const [keywords, setKeywords] = useState("");
   const [atmosphere, setAtmosphere] = useState("Vibrant, dangerous, mist-shrouded, forgotten tech");
   const [loading, setLoading] = useState(false);
   const [world, setWorld] = useState<FictionalWorld | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [savedWorlds, setSavedWorlds] = useState<FictionalWorld[]>([
-    {
-      worldName: "Eldoria’s Shrouded Rift",
-      overview: "A massive, light-reverent canyon world suspended between two colossal grinding tectonic plates, where pure glass storms sweep the dry floor and inhabitants live in houses carved inside porous, fossilized wood tunnels.",
-      locations: [
-        {
-          name: "The Sunken Spires of Eldoria",
-          sensoryDetail: "Smells of mossy stone and ozone. Cold, damp air that vibrates with a low mechanical hum. Sunlight is broken into amber strips.",
-          secretHistory: "Built before the Great Sealing, these towers were locked by the High Sages to contain the sentient wind. A forgotten copper coin is said to unlock the seals."
-        }
-      ],
-      culturalElements: [
-        {
-          name: "The Ritual of Lantern-Weaving",
-          description: "Every twilight, the citizens weave tiny light-trapping vines into wicker lanterns, letting them drift over the plates to ward off tectonic tremors."
-        }
-      ],
-      societalStructures: [
-        {
-          title: "The Glass Castes",
-          description: "Governed by the Glassblowers Guild, where your societal standing is determined by the size and transparency of your lineage's focal lens."
-        }
-      ]
+  const [savedWorlds, setSavedWorlds] = useState<FictionalWorld[]>(() => {
+    try {
+      const saved = localStorage.getItem("ai_story_saved_worlds");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error("Failed to parse saved worlds from localStorage", e);
     }
-  ]);
+    return [
+      {
+        worldName: "Eldoria’s Shrouded Rift",
+        overview: "A massive, light-reverent canyon world suspended between two colossal grinding tectonic plates, where pure glass storms sweep the dry floor and inhabitants live in houses carved inside porous, fossilized wood tunnels.",
+        locations: [
+          {
+            name: "The Sunken Spires of Eldoria",
+            sensoryDetail: "Smells of mossy stone and ozone. Cold, damp air that vibrates with a low mechanical hum. Sunlight is broken into amber strips.",
+            secretHistory: "Built before the Great Sealing, these towers were locked by the High Sages to contain the sentient wind. A forgotten copper coin is said to unlock the seals."
+          }
+        ],
+        culturalElements: [
+          {
+            name: "The Ritual of Lantern-Weaving",
+            description: "Every twilight, the citizens weave tiny light-trapping vines into wicker lanterns, letting them drift over the plates to ward off tectonic tremors."
+          }
+        ],
+        societalStructures: [
+          {
+            title: "The Glass Castes",
+            description: "Governed by the Glassblowers Guild, where your societal standing is determined by the size and transparency of your lineage's focal lens."
+          }
+        ]
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_story_saved_worlds", JSON.stringify(savedWorlds));
+    } catch (e) {
+      console.error("Failed to save worlds to localStorage", e);
+    }
+  }, [savedWorlds]);
+
+  const handleDeleteWorld = (indexToDelete: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setSavedWorlds((prev) => prev.filter((_, idx) => idx !== indexToDelete));
+    if (world && savedWorlds[indexToDelete] && world.worldName === savedWorlds[indexToDelete].worldName) {
+      setWorld(null);
+    }
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -73,14 +99,13 @@ export default function WorldBuilderTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          genre,
           keywords: keywords || "Ancient roots, humming bronze tubes, obsidian mirrors",
           atmosphere: atmosphere || "Eerie, eco-feudal, quiet decay",
         }),
       });
 
       if (!resp.ok) {
-        throw new Error("The world weaver encountered an epoch boundary error.");
+         throw new Error("The world setting weaver encountered an error.");
       }
 
       const data = await resp.json();
@@ -107,30 +132,13 @@ export default function WorldBuilderTab() {
             <div className="p-2 bg-[#5A5A40]/10 rounded-lg text-[#5A5A40]">
               <Globe className="w-5 h-5 animate-pulse" />
             </div>
-            <h3 className="font-display font-semibold text-lg text-[#33332d]">World Forge</h3>
+            <h3 className="font-display font-semibold text-lg text-[#33332d]">World Setting</h3>
           </div>
           <p className="text-xs text-[#88887e] mb-5 leading-relaxed">
-            Inscribe core thematic tags, atmospheres, or mystical motifs to cultivate a cohesive physical environment, localized cultures, and legal institutions.
+            Inscribe core atmospheric concepts and thematic tags to cultivate a cohesive physical world setting, local cultures, and structures.
           </p>
 
           <div className="space-y-4">
-            <div>
-              <label className="block font-sans text-[10px] font-bold uppercase tracking-wider text-[#88887e] mb-1.5">
-                World Bracket / Genre
-              </label>
-              <select
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="w-full text-xs font-sans rounded-lg border border-[#d5d5cd] bg-white p-2 text-[#33332d] focus:outline-none focus:border-[#5A5A40] transition-all"
-              >
-                {GENRES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label className="block font-sans text-[10px] font-bold uppercase tracking-wider text-[#88887e] mb-1.5">
                 Atmosphere & Mood
@@ -171,11 +179,11 @@ export default function WorldBuilderTab() {
           >
             {loading ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" /> Weaving World Fabric...
+                <RefreshCw className="w-4 h-4 animate-spin" /> Weaving World Setting...
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4" /> Forge World Foundations
+                <Sparkles className="w-4 h-4" /> Generate World Setting
               </>
             )}
           </button>
@@ -187,9 +195,9 @@ export default function WorldBuilderTab() {
         {loading && (
           <div className="flex-1 min-h-[400px] flex flex-col items-center justify-center gap-3 bg-[#fcfcf9] rounded-2xl border border-[#e5e5df] p-8 text-center animate-pulse">
             <Compass className="w-10 h-10 text-[#5A5A40] animate-spin mb-2" />
-            <p className="font-display italic text-sm text-[#44443d]">Expanding geographic boundaries, carving topography...</p>
+            <p className="font-display italic text-sm text-[#44443d]">Developing setting details, establishing environments...</p>
             <p className="text-[11px] font-sans text-[#88887e] max-w-sm">
-              Gemini is weaving structured locations, localized dialects, beliefs, and governance models directly from your seed keywords.
+              Gemini is weaving structured locations, localized cultures, and societal structures directly from your seed keywords.
             </p>
           </div>
         )}
@@ -198,9 +206,9 @@ export default function WorldBuilderTab() {
           <div className="flex-1 space-y-6">
             <div className="flex items-center justify-between">
               <h4 className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#a1a19a]">
-                Existing World Index
+                Saved World Settings
               </h4>
-              <span className="text-[10px] text-[#88887e] italic">{savedWorlds.length} realm(s) archived</span>
+              <span className="text-[10px] text-[#88887e] italic">{savedWorlds.length} world setting(s) saved</span>
             </div>
 
             {savedWorlds.map((w, idx) => (
@@ -208,13 +216,22 @@ export default function WorldBuilderTab() {
                 key={idx}
                 className="bg-[#fcfcf9] rounded-xl border border-[#e5e5df] p-6 hover:border-[#5A5A40]/40 transition-all shadow-sm"
               >
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-display font-semibold text-lg text-[#1a1a15]">
+                <div className="flex justify-between items-start gap-4 mb-3">
+                  <h3 className="font-display font-semibold text-lg text-[#1a1a15] flex-1">
                     {w.worldName}
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full bg-[#efeee8] text-[#5A5A40] font-sans text-[9px] uppercase font-bold tracking-wider">
-                    Realm Archetype
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#efeee8] text-[#5A5A40] font-sans text-[9px] uppercase font-bold tracking-wider shrink-0">
+                      World Setting
+                    </span>
+                    <button
+                      onClick={(e) => handleDeleteWorld(idx, e)}
+                      className="p-1 text-red-500 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0"
+                      title="Remove World Setting"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <p className="font-serif text-[13px] leading-relaxed text-[#44443d] mb-4 border-l-2 border-[#dcdcd4] pl-3 italic">
@@ -285,13 +302,13 @@ export default function WorldBuilderTab() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h4 className="font-sans text-[10px] font-bold uppercase tracking-widest text-[#a1a19a]">
-                Forging Result
+                World Setting Result
               </h4>
               <button
                 onClick={() => setWorld(null)}
-                className="text-[10px] font-sans text-[#5A5A40] hover:underline"
+                className="text-[10px] font-sans text-[#5A5A40] hover:underline hover:text-[#4a4a35] cursor-pointer"
               >
-                Clear to View All Realm Libraries
+                Clear to View All Saved Settings
               </button>
             </div>
 
@@ -302,7 +319,7 @@ export default function WorldBuilderTab() {
               </div>
 
               <span className="text-[10px] font-sans font-bold text-[#5A5A40] uppercase tracking-wider block mb-1">
-                New Reality Manifested
+                New World Setting Generated
               </span>
               <h3 className="font-display font-semibold text-2xl text-[#1a1a15] mb-2">
                 {world.worldName}

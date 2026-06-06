@@ -983,7 +983,7 @@ export default function App() {
                 selectedMainTab === "world" ? "bg-white text-[#5A5A40] shadow-sm" : "text-[#88887e] hover:text-[#33332d]"
               }`}
             >
-              World Forge
+              World Setting
             </button>
             <button
               onClick={() => setSelectedMainTab("characters")}

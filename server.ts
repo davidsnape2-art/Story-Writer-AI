@@ -417,19 +417,18 @@ Provide:
   }
 });
 
-// 8. Fictional World Builder based on keywords, atmosphere, and genre
+// 8. Fictional World Setting based on keywords and atmosphere
 app.post("/api/gemini/world-builder", async (req, res) => {
   try {
-    const { keywords, atmosphere, genre } = req.body;
+    const { keywords, atmosphere } = req.body;
     const ai = getGeminiClient();
 
-    const prompt = `Construct an immersive, detailed fictional world based on:
+    const prompt = `Construct an immersive, detailed fictional world setting based on:
 - Seeds/Keywords: ${keywords || "Ancient moss, silent bells, cold copper pipes"}
 - Atmosphere/Tone: ${atmosphere || "Melancholy, mysterious, eco-industrial"}
-- Genre: ${genre || "Speculative Epic"}
 
 Generate:
-1. A unique thematic name for this world or region.
+1. A unique thematic name for this world setting or region.
 2. A rich overview of this setting's environment, geography, and general feel (minimum 150 words).
 3. 3 prominent key locations, each defined by a name, rich sensory details (smell, light, temperature), and a secret history or forgotten legend associated with it.
 4. 3 cultural elements (such as strange rituals, grand celebrations, typical clothes, traditional food, or spiritual beliefs).
@@ -439,7 +438,7 @@ Generate:
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
-        systemInstruction: "You are an award-winning world-builder and fantasy/sci-fi cartographer of words. You construct logical, lived-in, incredibly atmospheric fantasy, cyberpunk, or historical realities.",
+        systemInstruction: "You are an award-winning world-builder and fantasy/sci-fi cartographer of words. You construct logical, lived-in, incredibly atmospheric fantasy, cyberpunk, speculative, or realistic world settings.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
