@@ -347,12 +347,13 @@ Each option must include:
 // 7. Suggest detailed character backstories, motivations, and key personality traits
 app.post("/api/gemini/character-suggest", async (req, res) => {
   try {
-    const { name, archetype, description } = req.body;
+    const { name, archetype, description, role } = req.body;
     const ai = getGeminiClient();
 
     const prompt = `Flesh out a compelling, multi-dimensional character based on the following input:
 - Name: ${name || "A Nameless Wanderer"}
 - Archetype: ${archetype || "Unspecified"}
+- Narrative Role / Story Purpose: ${role || "Unspecified"}
 - Initial Description/Seed: ${description || "A mysterious figure seen at the edge of town"}
 
 Provide:
@@ -361,7 +362,8 @@ Provide:
 3. A detailed, multi-paragraph character backstory (minimum 200 words) explaining how they became who they are today, including formative traumas, childhood events, or secrets.
 4. Deep motivations (what drives them, their primary ambition, internal conflict, and the 'core lie' they tell themselves to cope with life).
 5. Compelling personality traits (a mix of 3 distinct strengths and 3 tragic, compelling flaws).
-6. Quirks or habits (list of 3 unique behaviors, speech tics, or physical mannerisms).`;
+6. Quirks or habits (list of 3 unique behaviors, speech tics, or physical mannerisms).
+7. A refined, short summary statement of their Narrative Role / Story Purpose (based on the user-given role details).`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -374,6 +376,7 @@ Provide:
           properties: {
             name: { type: Type.STRING },
             archetype: { type: Type.STRING },
+            role: { type: Type.STRING, description: "Refined, brief description of their story role / narrative purpose." },
             tagline: { type: Type.STRING },
             physicalAppearance: { type: Type.STRING },
             backstory: { type: Type.STRING, description: "Detailed, immersive story prose." },
@@ -395,11 +398,16 @@ Provide:
       },
     });
 
-    let data = {};
+    let data: any = {};
     try {
       data = JSON.parse(response.text?.trim() || "{}");
     } catch {
       data = { error: "Failed to parse character payload", text: response.text };
+    }
+
+    // Default role backup
+    if (!data.role && role) {
+      data.role = role;
     }
 
     res.json(data);

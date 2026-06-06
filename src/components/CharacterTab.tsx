@@ -17,6 +17,7 @@ interface CharacterTabProps {
 export default function CharacterTab({ characters, onAddCharacter, onDeleteCharacter, onSelectCharacterForCanvas }: CharacterTabProps) {
   const [name, setName] = useState("");
   const [archetype, setArchetype] = useState("Profound Martyr");
+  const [role, setRole] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +44,7 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
         body: JSON.stringify({
           name: name || "Lyra Woodsen",
           archetype: archetype || "The Outcast Healer",
+          role: role || "",
           description: description || "A quiet woman traveling alone through dangerous borders, seeking a key that doesn't fit any known locks.",
         }),
       });
@@ -60,6 +62,7 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
       const characterPayload: Partial<Character> = {
         name: data.name || "Lyra Woodsen",
         archetype: data.archetype || archetype,
+        role: data.role || role || "",
         tagline: data.tagline || "Walking in silence between forgotten border gates.",
         physicalAppearance: data.physicalAppearance || "Slender build, dark linen hood, calloused hands smelling of wild juniper.",
         internalDrive: data.motivations || "Driven to unlock her sister's clockwork consciousness.",
@@ -83,6 +86,7 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
       id: "char-" + Date.now(),
       name: previewChar.name || "Unnamed Figure",
       archetype: previewChar.archetype || "Unknown",
+      role: previewChar.role || "",
       tagline: previewChar.tagline || "",
       physicalAppearance: previewChar.physicalAppearance || "",
       internalDrive: previewChar.internalDrive || "",
@@ -93,6 +97,7 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
     onAddCharacter(finalChar);
     setPreviewChar(null);
     setName("");
+    setRole("");
     setDescription("");
     setActiveTab("index");
   };
@@ -156,9 +161,16 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
                         <h4 className="font-display font-bold text-base text-[#1a1a15] flex items-center gap-1.5">
                           {char.name}
                         </h4>
-                        <p className="font-sans text-[10px] uppercase font-bold text-[#5A5A40] tracking-wider">
-                          {char.archetype || "Archetype Unspecified"}
-                        </p>
+                        <div className="flex flex-col gap-0.5">
+                          <p className="font-sans text-[10px] uppercase font-bold text-[#5A5A40] tracking-wider">
+                            {char.archetype || "Archetype Unspecified"}
+                          </p>
+                          {char.role && (
+                            <p className="font-sans text-[10.5px] font-semibold text-[#666657]">
+                              Role: {char.role}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {onDeleteCharacter && (
@@ -181,6 +193,17 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
                   </p>
 
                   <div className="space-y-3.5 text-xs">
+                    {char.role && (
+                      <div>
+                        <h5 className="font-sans text-[9px] font-bold text-[#a1a19a] uppercase tracking-wider mb-1 flex items-center gap-1">
+                          <Users className="w-3 h-3 text-[#5A5A40]" /> Narrative Role / Story Purpose
+                        </h5>
+                        <p className="font-sans text-[11.5px] leading-relaxed text-[#5A5A40] font-medium bg-[#5A5A40]/5 px-2.5 py-1.5 rounded-lg border border-[#5A5A40]/10">
+                          {char.role}
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <h5 className="font-sans text-[9px] font-bold text-[#a1a19a] uppercase tracking-wider mb-1 flex items-center gap-1">
                         <Award className="w-3 h-3 text-[#5A5A40]" /> Dynamic Drive & Motivations
@@ -285,6 +308,22 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
 
                 <div>
                   <label className="block font-sans text-[9px] font-bold uppercase tracking-wider text-[#88887e] mb-1">
+                    Story Role & Narrative Purpose
+                  </label>
+                  <input
+                    type="text"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    placeholder="E.g., Protagonist's secret informant, double agent, or cynical companion"
+                    className="w-full text-xs font-sans rounded-lg border border-[#d5d5cd] bg-white p-2 text-[#33332d] focus:outline-none focus:border-[#5A5A40] transition-all"
+                  />
+                  <p className="text-[9px] text-[#88887e] mt-1 italic">
+                    Specify the character's active story role to steer the AI's descriptive and backstory generation.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-sans text-[9px] font-bold uppercase tracking-wider text-[#88887e] mb-1">
                     Describe what you know so far
                   </label>
                   <textarea
@@ -351,7 +390,12 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
                       </div>
                       <div>
                         <h4 className="font-display font-bold text-base text-[#1a1a15]">{previewChar.name}</h4>
-                        <span className="font-sans text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider">{previewChar.archetype}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-sans text-[10px] font-bold text-[#5A5A40] uppercase tracking-wider">{previewChar.archetype}</span>
+                          {previewChar.role && (
+                            <span className="font-sans text-[10.5px] font-semibold text-[#666657]">Role: {previewChar.role}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded bg-[#5A5A40]/10 text-[#5A5A40] font-sans text-[9px] uppercase font-bold">Preview Portrait</span>
@@ -362,6 +406,17 @@ export default function CharacterTab({ characters, onAddCharacter, onDeleteChara
                   </p>
 
                   <div className="space-y-4 text-xs pr-1">
+                    {previewChar.role && (
+                      <div>
+                        <h5 className="font-sans text-[9px] font-bold uppercase tracking-wider text-[#a1a19a] mb-1">
+                          Narrative Role / Story Purpose
+                        </h5>
+                        <p className="font-sans text-[11.5px] leading-relaxed text-[#5A5A40] font-medium bg-[#5A5A40]/5 px-2.5 py-1.5 rounded-lg border border-[#5A5A40]/10">
+                          {previewChar.role}
+                        </p>
+                      </div>
+                    )}
+
                     <div>
                       <h5 className="font-sans text-[9px] font-bold uppercase tracking-wider text-[#a1a19a] mb-1">
                         Motivation & Core Lie (Internal Battle)
