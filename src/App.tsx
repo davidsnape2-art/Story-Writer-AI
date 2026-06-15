@@ -300,22 +300,9 @@ export default function App() {
       }
 
       const data = await response.json();
-      const rawText = data.text || "";
+      
+      let newAnalyticsResult;
 
-      // Precise extracting considering score tags so they don't pollute the textual summaries
-      const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
-      const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
-      // Clean parsing for BETA block so the score tags at the very bottom are not included in the beta block
-      const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)(?=\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
-
-      // Regex matches to pull numerical scores
-      const sensoryScoreMatch = rawText.match(/\[SENSORY SCORE\]\s*(\d+)/i);
-      const pacingScoreMatch = rawText.match(/\[PACING SCORE\]\s*(\d+)/i);
-      const betaScoreMatch = rawText.match(/\[BETA SCORE\]\s*(\d+)/i);
-      const overallScoreMatch = rawText.match(/\[OVERALL SCORE\]\s*(\d+)/i);
-      const pacingCategoryMatch = rawText.match(/\[PACING CATEGORY\]\s*([^\[\n\r]+)/i);
-
-      const rawCategory = pacingCategoryMatch ? pacingCategoryMatch[1].trim() : "Steady Pacing";
       const scoreMapping: Record<string, number> = {
         "Flat / Static": 1,
         "Slow Burn": 2,
@@ -324,23 +311,58 @@ export default function App() {
         "Breakneck / Intense": 5
       };
 
-      const matchedKey = Object.keys(scoreMapping).find(
-        key => key.toLowerCase() === rawCategory.replace(/['"“”]/g, "").trim().toLowerCase()
-      ) || "Steady Pacing";
+      if (data.overallScore !== undefined) {
+        // Direct, modern parsing from structured JSON (guaranteed by Gemini 3.5 Schema output)
+        const rawCategory = data.pacingCategory || "Steady Pacing";
+        const matchedKey = Object.keys(scoreMapping).find(
+          key => key.toLowerCase() === rawCategory.replace(/['"“”]/g, "").trim().toLowerCase()
+        ) || "Steady Pacing";
+        const pacingValue = scoreMapping[matchedKey];
 
-      const pacingValue = scoreMapping[matchedKey];
+        newAnalyticsResult = {
+          sensory: data.sensory || "No sensory feedback generated.",
+          sensoryScore: data.sensoryScore !== undefined ? Number(data.sensoryScore) : undefined,
+          pacing: data.pacing || "No pacing feedback generated.",
+          pacingScore: data.pacingScore !== undefined ? Number(data.pacingScore) : undefined,
+          beta: data.beta || "No beta reader critique generated.",
+          betaScore: data.betaScore !== undefined ? Number(data.betaScore) : undefined,
+          overallScore: data.overallScore !== undefined ? Number(data.overallScore) : undefined,
+          pacingCategory: matchedKey,
+          pacingValue: pacingValue,
+        };
+      } else {
+        // Fallback to legacy regex parsing if the server ever returned unstructured text
+        const rawText = data.text || "";
 
-      const newAnalyticsResult = {
-        sensory: sensoryMatch ? sensoryMatch[1].trim() : "Analysis parsing failed for this segment.",
-        sensoryScore: sensoryScoreMatch ? parseInt(sensoryScoreMatch[1], 10) : undefined,
-        pacing: pacingMatch ? pacingMatch[1].trim() : "Analysis parsing failed for this segment.",
-        pacingScore: pacingScoreMatch ? parseInt(pacingScoreMatch[1], 10) : undefined,
-        beta: betaMatch ? betaMatch[1].trim() : (rawText.split(/\[BETA READER CRITIQUE\]/i)[1] || rawText).trim(),
-        betaScore: betaScoreMatch ? parseInt(betaScoreMatch[1], 10) : undefined,
-        overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : undefined,
-        pacingCategory: matchedKey,
-        pacingValue: pacingValue,
-      };
+        const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
+        const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
+        const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)(?=\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i);
+
+        const sensoryScoreMatch = rawText.match(/\[SENSORY SCORE\]\s*(\d+)/i);
+        const pacingScoreMatch = rawText.match(/\[PACING SCORE\]\s*(\d+)/i);
+        const betaScoreMatch = rawText.match(/\[BETA SCORE\]\s*(\d+)/i);
+        const overallScoreMatch = rawText.match(/\[OVERALL SCORE\]\s*(\d+)/i);
+        const pacingCategoryMatch = rawText.match(/\[PACING CATEGORY\]\s*([^\[\n\r]+)/i);
+
+        const rawCategory = pacingCategoryMatch ? pacingCategoryMatch[1].trim() : "Steady Pacing";
+        const matchedKey = Object.keys(scoreMapping).find(
+          key => key.toLowerCase() === rawCategory.replace(/['"“”]/g, "").trim().toLowerCase()
+        ) || "Steady Pacing";
+
+        const pacingValue = scoreMapping[matchedKey];
+
+        newAnalyticsResult = {
+          sensory: sensoryMatch ? sensoryMatch[1].trim() : "Analysis parsing failed for this segment.",
+          sensoryScore: sensoryScoreMatch ? parseInt(sensoryScoreMatch[1], 10) : undefined,
+          pacing: pacingMatch ? pacingMatch[1].trim() : "Analysis parsing failed for this segment.",
+          pacingScore: pacingScoreMatch ? parseInt(pacingScoreMatch[1], 10) : undefined,
+          beta: betaMatch ? betaMatch[1].trim() : (rawText.split(/\[BETA READER CRITIQUE\]/i)[1] || rawText).trim(),
+          betaScore: betaScoreMatch ? parseInt(betaScoreMatch[1], 10) : undefined,
+          overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : undefined,
+          pacingCategory: matchedKey,
+          pacingValue: pacingValue,
+        };
+      }
 
       setAnalyticsResult(newAnalyticsResult);
 

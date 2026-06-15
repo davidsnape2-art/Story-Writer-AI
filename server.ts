@@ -238,52 +238,88 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
     const ai = getGeminiClient();
 
     const analysisPrompt = `
-  You are a ruthless, highly sought-after literary developmental editor and prose colorist. 
-  Your job is to conduct a clinical diagnostic audit of the text provided below. 
-  Do not offer generic praise or conversational pleasantries. Provide sharp, actionable, mechanical writing critiques.
+  You are an expert literary developmental editor and prose partner. 
+  Your job is to conduct a detailed clinical diagnostic audit of the story chapter provided below.
 
   Analyze the text strictly using the following three diagnostic frameworks:
 
-  [SENSORY CHECK]
-  - Audit the text for VAKOG (Visual, Auditory, Kinesthetic, Olfactory, Gustatory) distribution.
-  - Diagnose if the scene suffers from "White Room Syndrome" (characters talking in a blank, unrendered void).
-  - Identify the exact lines where sensory details are completely missing, and specify which non-visual sense (sound, texture, scent, taste) would elevate the scene's immersion.
+  1. Sensory Check (VAKOG):
+     - Audit the text for Sensory / VAKOG (Visual, Auditory, Kinesthetic, Olfactory, Gustatory) distribution.
+     - Note if the scene suffers from "White Room Syndrome" (characters talking in a blank, unrendered void).
+     - Pinpoint clean, actionable recommendations or missing details to elevate the reader's immersion.
 
-  [PACING REPORT]
-  - Map the narrative velocity. Identify the exact paragraphs where the pacing drags due to over-explanation, unnecessary internal monologue, or redundant exposition.
-  - Pinpoint where the prose rushes through critical emotional or high-tension turning points without letting the moment "breathe."
-  - Provide a clear directive on which sentences to cut, compress, or expand to restore an ideal structural rhythm.
+  2. Pacing Audit:
+     - Map narrative velocity.
+     - Identify where the prose drags (exposition/dry monologue) or where it rushes (high tension turning points).
+     - Recommend sentences to compress, expand, or cut.
 
-  [BETA READER CRITIQUE]
-  - Evaluate character agency and logic: Are the characters acting on genuine internal motivations, or are they being artificially pushed around by the plot?
-  - Identify "on-the-nose" dialogue where characters are explicitly stating their feelings instead of letting subtext, tension, or body language do the work.
-  - Flag any logical consistency errors or unearned emotional payoffs.
+  3. Beta Reader Critique:
+     - Focus on character agency, logical consistency, dialogue realism, and subtextual tension.
 
-  Additionally, calculate numeric grades (0 to 100) assessing each framework's quality level, as well as an overall manuscript quality grade.
-  Also, select the precise pacing category that describes the current manuscript from one of these exact values: "Flat / Static", "Slow Burn", "Steady Pacing", "Highly Engaging", or "Breakneck / Intense".
-  Put these grades and the selected category strictly in these exact headers at the end of your response:
-  [SENSORY SCORE] <number from 0 to 100>
-  [PACING SCORE] <number from 0 to 100>
-  [BETA SCORE] <number from 0 to 100>
-  [OVERALL SCORE] <number from 0 to 100>
-  [PACING CATEGORY] <one of the exact values listed above>
+  Output your responses strictly in the requested JSON structure. Provide elegant, rich, detailed markdown prose for the 'sensory', 'pacing', and 'beta' textual feedback keys.
+  Assess numeric scores (0 to 100) and choose a precise pacing category ("Flat / Static", "Slow Burn", "Steady Pacing", "Highly Engaging", or "Breakneck / Intense").
 
-  MANUSCRIPT FOR INVENTORY:
+  CHAPTER MANUSCRIPT:
   """
   ${content}
   """
 `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: analysisPrompt,
       config: {
         systemInstruction: "You are an award-winning creative writing instructor and structural book critique partner. Provide helpful, precise, objective, and constructive advice without generic praise. Focus purely on literary enhancements.",
-        temperature: 0.0,
+        temperature: 0.2,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            sensory: { 
+              type: Type.STRING, 
+              description: "Detailed critique and recommendations regarding the sensory check (VAKOG distribution, 'White Room Syndrome' diagnosis, missing sensory elements, concrete ideas/sentences to add)." 
+            },
+            sensoryScore: { 
+              type: Type.INTEGER, 
+              description: "A quality score from 0 to 100 assessing the sensory/immersion richness in the chapter manuscript." 
+            },
+            pacing: { 
+              type: Type.STRING, 
+              description: "In-depth pacing report mapping dynamic velocity, highlighting slow or over-explained details, identifying rushed scenes, and recommending sentences to expand or compress." 
+            },
+            pacingScore: { 
+              type: Type.INTEGER, 
+              description: "A quality score from 0 to 100 reflecting how well-paced and structured the chapter rhythm feels." 
+            },
+            beta: { 
+              type: Type.STRING, 
+              description: "Critical beta reader feedback analyzing character agency, dialogue realism, logical consistency under subtext/tension, and any unearned emotional payoffs." 
+            },
+            betaScore: { 
+              type: Type.INTEGER, 
+              description: "A quality score from 0 to 100 evaluating narrative consistency, character internal logic, and realism." 
+            },
+            overallScore: { 
+              type: Type.INTEGER, 
+              description: "An overall composite score from 0 to 100 capturing prose quality, style consistency, and structural layout." 
+            },
+            pacingCategory: { 
+              type: Type.STRING, 
+              description: "The primary narrative velocity indicator. Must be exactly one of: 'Flat / Static', 'Slow Burn', 'Steady Pacing', 'Highly Engaging', or 'Breakneck / Intense'." 
+            }
+          },
+          required: ["sensory", "sensoryScore", "pacing", "pacingScore", "beta", "betaScore", "overallScore", "pacingCategory"]
+        }
       },
     });
 
-    res.json({ text: response.text || "" });
+    try {
+      const parsed = JSON.parse(response.text || "{}");
+      res.json(parsed);
+    } catch (parseErr) {
+      console.error("Failed to parse JSON response from Gemini, sending raw text:", response.text);
+      res.json({ text: response.text || "" });
+    }
   } catch (error: any) {
     console.error("Gemini Chapter Analyze Error:", error);
     res.status(500).json({ error: error.message || "An error occurred during chapter analysis." });
