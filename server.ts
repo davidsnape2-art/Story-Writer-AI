@@ -237,31 +237,40 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
     }
     const ai = getGeminiClient();
 
+    // Optimize and protect against ultra-long chapters that cause generation delay
+    let processedContent = content;
+    if (processedContent.length > 15000) {
+      processedContent = processedContent.slice(0, 15000) + "\n\n[... Remaining description truncated for diagnostic review speed ...]";
+    }
+
     const analysisPrompt = `
   You are an expert literary developmental editor and prose partner. 
-  Your job is to conduct a detailed clinical diagnostic audit of the story chapter provided below.
+  Your job is to conduct an extremely fast, high-density, actionable clinical diagnostic audit of the story chapter provided below.
 
   Analyze the text strictly using the following three diagnostic frameworks:
 
   1. Sensory Check (VAKOG):
      - Audit the text for Sensory / VAKOG (Visual, Auditory, Kinesthetic, Olfactory, Gustatory) distribution.
      - Note if the scene suffers from "White Room Syndrome" (characters talking in a blank, unrendered void).
-     - Pinpoint clean, actionable recommendations or missing details to elevate the reader's immersion.
+     - Highlight exactly where sensory details are missing and how to enrich them.
 
   2. Pacing Audit:
-     - Map narrative velocity.
-     - Identify where the prose drags (exposition/dry monologue) or where it rushes (high tension turning points).
-     - Recommend sentences to compress, expand, or cut.
+     - Map narrative velocity and focus on key scene pacing.
+     - Identify where the prose drags or where it rushes.
+     - Provide a clear, actionable directive on sentences/paragraphs to cut, compress, or expand.
 
   3. Beta Reader Critique:
-     - Focus on character agency, logical consistency, dialogue realism, and subtextual tension.
+     - Focus on character agency, logical consistency, realistic dialogue, and subtextual tension.
 
-  Output your responses strictly in the requested JSON structure. Provide elegant, rich, detailed markdown prose for the 'sensory', 'pacing', and 'beta' textual feedback keys.
-  Assess numeric scores (0 to 100) and choose a precise pacing category ("Flat / Static", "Slow Burn", "Steady Pacing", "Highly Engaging", or "Breakneck / Intense").
+  Guidelines for Output Quality & Speed:
+  - Keep each textual description in the JSON extremely high-density, sharp, and structured as 3-4 clean, bite-sized markdown bullet points (using bold highlights).
+  - Do NOT write long-winded conversational introductions, generic preamble, or filler paragraphs. Cut to the chase!
+  - Maximum 150-200 words per textual feedback key. This is a sidebar review companion, so make every word count.
+  - Assess numerical scores from 0 to 100 for each, plus an overall score. Select a precise pacing category ("Flat / Static", "Slow Burn", "Steady Pacing", "Highly Engaging", or "Breakneck / Intense").
 
   CHAPTER MANUSCRIPT:
   """
-  ${content}
+  ${processedContent}
   """
 `;
 
