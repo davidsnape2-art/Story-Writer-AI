@@ -323,10 +323,23 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
     });
 
     try {
-      const parsed = JSON.parse(response.text || "{}");
+      let rawText = response.text || "";
+      rawText = rawText.trim();
+      
+      // Resiliently extract JSON content inside markdown code blocks if present
+      if (rawText.includes("```")) {
+        const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          rawText = jsonMatch[1].trim();
+        } else {
+          rawText = rawText.replace(/^```(?:json)?\n?|```$/g, "").trim();
+        }
+      }
+      
+      const parsed = JSON.parse(rawText || "{}");
       res.json(parsed);
     } catch (parseErr) {
-      console.error("Failed to parse JSON response from Gemini, sending raw text:", response.text);
+      console.error("Failed to parse JSON response from Gemini, sending raw text:", response.text, parseErr);
       res.json({ text: response.text || "" });
     }
   } catch (error: any) {
