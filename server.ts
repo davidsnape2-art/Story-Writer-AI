@@ -231,7 +231,7 @@ app.post("/api/gemini/chat", async (req, res) => {
 // 5.5. Editorial Chapter Analytics (Sensory Check, Pacing, Beta Critique)
 app.post("/api/gemini/analyze-chapter", async (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, previousAnalysis, mode } = req.body;
     if (!content || !content.trim()) {
       return res.status(400).json({ error: "Chapter manuscript content is required for analysis." });
     }
@@ -243,9 +243,39 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
       processedContent = processedContent.slice(0, 15000) + "\n\n[... Remaining description truncated for diagnostic review speed ...]";
     }
 
+    let evolutionDirectives = "";
+    if (mode !== "fresh" && previousAnalysis && typeof previousAnalysis === "object") {
+      const prev = previousAnalysis;
+      evolutionDirectives = `
+  =========================================
+  CONTINUOUS ANALYSIS & EVOLUTION DIRECTIVE:
+  =========================================
+  The user is incrementally refining this chapter using your previous audit as a roadmap.
+  You MUST build upon and evolve your previous feedback instead of starting from scratch!
+  
+  PREVIOUS AUDIT RESULTS:
+  - Overall Score: ${prev.overallScore || "Not set"}/100
+  - Sensory Index: Score of ${prev.sensoryScore || "Not set"}/100
+    * Previous Sensory Feedback: "${prev.sensory || ""}"
+  - Pacing Profile: Score of ${prev.pacingScore || "Not set"}/100
+    * Previous Pacing Feedback: "${prev.pacing || ""}"
+  - Beta Reader Profile: Score of ${prev.betaScore || "Not set"}/100
+    * Previous Beta Critique: "${prev.beta || ""}"
+  - Previous Pacing Category: "${prev.pacingCategory || ""}"
+
+  FOLLOW-UP INSTRUCTIONS:
+  1. Compare the new chapter text with your previous critiques listed above.
+  2. If the user successfully added sensory details, corrected pacing, or improved dialogue/agency based on your previous critiques, you MUST raise the scores accordingly! Acknowledge their improvements in the feedback text (e.g. "Draft updated: Excellent job incorporating the clockwork sounds...").
+  3. Keep your editorial advice focused and consistent. Do not suddenly invent a list of completely new, contradictory complaints or drop their scores without a logical reason (such as a bad rewrite). Keep the author's momentum positive and goal-oriented. Do not contradict your previous suggestions.
+  4. Your new feedback fields (sensory, pacing, beta) should represent the current *remaining* or *updated* points of concern, combined with positive reinforcement of handled feedback, keeping it around 150-200 words max each.
+  =========================================
+  `;
+    }
+
     const analysisPrompt = `
   You are an expert literary developmental editor and prose partner. 
   Your job is to conduct an extremely fast, high-density, actionable clinical diagnostic audit of the story chapter provided below.
+  ${evolutionDirectives}
 
   Analyze the text strictly using the following three diagnostic frameworks:
 
@@ -555,6 +585,138 @@ Generate:
   } catch (error: any) {
     console.error("World Builder Error:", error);
     res.status(500).json({ error: error.message || "Failed to generate fictional world guide." });
+  }
+});
+
+// 5.6. Macro Story Flow & Chapter Transition Analyst
+app.post("/api/gemini/analyze-story-flow", async (req, res) => {
+  try {
+    const { chapters } = req.body;
+    if (!chapters || !Array.isArray(chapters) || chapters.length === 0) {
+      return res.status(400).json({ error: "Story chapters list is required to evaluate overall flow." });
+    }
+
+    const ai = getGeminiClient();
+
+    // Prepare a high-density index summary of each chapter's details for fast evaluation
+    const chaptersContext = chapters.map((ch, index) => {
+      const summaryContent = ch.content || "";
+      const wordCount = summaryContent.split(/\s+/).filter(Boolean).length;
+      const snippet = summaryContent.length > 2000
+        ? summaryContent.substring(0, 1000) + "\n\n[...]\n\n" + summaryContent.substring(summaryContent.length - 1000)
+        : summaryContent;
+
+      const scores = ch.analytics ? {
+        overall: ch.analytics.overallScore,
+        sensory: ch.analytics.sensoryScore,
+        pacing: ch.analytics.pacingScore,
+        beta: ch.analytics.betaScore,
+        pacingCategory: ch.analytics.pacingCategory,
+      } : "No individual chapter analysis run yet.";
+
+      return {
+        index: index + 1,
+        id: ch.id,
+        title: ch.title || `Chapter ${index + 1}`,
+        wordCount,
+        scores,
+        manuscriptSnippet: snippet,
+      };
+    });
+
+    const flowPrompt = `
+  You are an expert Chief developmental editor and narrative architect. 
+  Your job is to conduct a master clinical analysis of the "macro flow" and "narrative velocity connectivity" across the chapters listed below.
+  
+  Please analyze:
+  1. The overall coherence and flow quality of the story line.
+  2. The transitions between successive chapters (e.g., Chapter 1 to Chapter 2, Chapter 2 to Chapter 3). Identify jarring leaps, abrupt emotional tones, or continuity speedbumps.
+  3. The pacing distribution wave: is the story building continuous healthy writing momentum or stalling out?
+  4. The sensory balance: checking if some chapters are loaded with environmental rendering while others feel like a "white room".
+  
+  Combine these dimensions and construct a definitive unified story-wide flow directive.
+
+  STORY CHAPTERS FOR INVENTORY:
+  ${JSON.stringify(chaptersContext, null, 2)}
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: flowPrompt,
+      config: {
+        systemInstruction: "You are an elite narrative design consultant. You critique full-length novels and manuscripts, providing helpful, objective developmental feedback on structure, chapter handoffs, transitions, and flow continuity.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            coherenceScore: { 
+              type: Type.INTEGER, 
+              description: "A composite macro story flow quality index from 0 to 100 summarizing how cohesive and fluid the chapter handoffs feel." 
+            },
+            flowOverview: { 
+              type: Type.STRING, 
+              description: "A professional, elegant 2-paragraph general markdown critique of the macro story flow, continuity, and tension progression." 
+            },
+            pacingDistribution: { 
+              type: Type.STRING, 
+              description: "A markdown summary reviewing the narrative speed wave. Are speed leaps handled smoothly? Is tension distributed comfortably?" 
+            },
+            sensoryHarmony: { 
+              type: Type.STRING, 
+              description: "A markdown audit of environmental balance across chapters. Highlight if some chapters feel unrendered compared to others." 
+            },
+            transitions: {
+              type: Type.ARRAY,
+              description: "Transition critiques between consecutive numbered chapters.",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  fromChapter: { type: Type.STRING, description: "Title of Chapter N" },
+                  toChapter: { type: Type.STRING, description: "Title of Chapter N+1" },
+                  flowRating: { 
+                    type: Type.STRING, 
+                    description: "Transition comfort rating. Must be exactly one of: 'Jarring', 'Bumpy', 'Decent', 'Smooth', or 'Masterful'." 
+                  },
+                  critique: { 
+                    type: Type.STRING, 
+                    description: "2-3 precise, sharp sentences analyzing how the narrative hand-off flows across physical action, character motives, or time jumps." 
+                  }
+                },
+                required: ["fromChapter", "toChapter", "flowRating", "critique"]
+              }
+            },
+            macroImprovementPlan: {
+              type: Type.ARRAY,
+              description: "Consolidated, highly actionable master recommendations to make the chapters flow together beautifully.",
+              items: { type: Type.STRING }
+            }
+          },
+          required: ["coherenceScore", "flowOverview", "pacingDistribution", "sensoryHarmony", "transitions", "macroImprovementPlan"]
+        },
+        temperature: 0.3,
+      },
+    });
+
+    try {
+      let rawText = response.text || "{}";
+      rawText = rawText.trim();
+      if (rawText.includes("```")) {
+        const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          rawText = jsonMatch[1].trim();
+        } else {
+          rawText = rawText.replace(/^```(?:json)?\n?|```$/g, "").trim();
+        }
+      }
+      const data = JSON.parse(rawText);
+      res.json(data);
+    } catch (parseErr) {
+      console.error("Failed to parse story flow JSON response from Gemini, raw payload:", response.text, parseErr);
+      res.json({ error: "Failed to parse narrative flow analysis payloads.", text: response.text });
+    }
+  } catch (error: any) {
+    console.error("Story Flow Analysis Error:", error);
+    res.status(500).json({ error: error.message || "Failed to analyze whole story flow." });
   }
 });
 

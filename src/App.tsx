@@ -38,6 +38,7 @@ import WorldBuilderTab from "./components/WorldBuilderTab";
 import CharacterTab from "./components/CharacterTab";
 import RefinementPanel from "./components/RefinementPanel";
 import CoWriterChat from "./components/CoWriterChat";
+import StoryFlowTab from "./components/StoryFlowTab";
 
 export default function App() {
   // Primary app state - lazy initialization from LocalStorage
@@ -51,7 +52,7 @@ export default function App() {
     }
   });
 
-  const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "incubate" | "world" | "characters">("canvas");
+  const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "incubate" | "world" | "characters" | "flow">("canvas");
   const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline" | "lore">("structure");
   const [rightPanelTab, setRightPanelTab] = useState<AiTab>("refine");
 
@@ -77,6 +78,7 @@ export default function App() {
   // Selection states & floating contextual menu
   const [highlightedText, setHighlightedText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisMode, setAnalysisMode] = useState<"progressive" | "fresh">("progressive");
   const [analyticsResult, setAnalyticsResult] = useState<{
     sensory: string;
     sensoryScore?: number;
@@ -285,6 +287,8 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: activeCh.content,
+          previousAnalysis: activeCh.analytics || analyticsResult || undefined,
+          mode: analysisMode,
         }),
       });
 
@@ -421,6 +425,115 @@ export default function App() {
       showNotification("Analytics failed: " + (error.message || "Unknown error"));
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleAnalyzeSpecificChapter = async (chapterId: string) => {
+    const ch = story.chapters.find((c) => c.id === chapterId);
+    if (!ch || !ch.content.trim()) {
+      showNotification("Cannot analyze empty manuscript.");
+      return;
+    }
+
+    try {
+      showNotification(`Initiated fast audit for chapter: "${ch.title}"...`);
+      const response = await fetch("/api/gemini/analyze-chapter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: ch.content,
+          previousAnalysis: ch.analytics || undefined,
+          mode: "progressive",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const scoreMapping: Record<string, number> = {
+        "Flat / Static": 15,
+        "Slow Burn": 45,
+        "Steady Pacing": 70,
+        "Highly Engaging": 88,
+        "Breakneck / Intense": 98,
+      };
+
+      let newAnalyticsResult;
+
+      if (data.overallScore !== undefined) {
+        const rawCategory = data.pacingCategory || "Steady Pacing";
+        const matchedKey = Object.keys(scoreMapping).find(
+          (key) => key.toLowerCase() === rawCategory.replace(/['"“”]/g, "").trim().toLowerCase()
+        ) || "Steady Pacing";
+        const pacingValue = scoreMapping[matchedKey];
+
+        newAnalyticsResult = {
+          sensory: data.sensory || "No sensory feedback generated.",
+          sensoryScore: data.sensoryScore !== undefined ? Number(data.sensoryScore) : 75,
+          pacing: data.pacing || "No pacing feedback generated.",
+          pacingScore: data.pacingScore !== undefined ? Number(data.pacingScore) : 75,
+          beta: data.beta || "No beta reader critique generated.",
+          betaScore: data.betaScore !== undefined ? Number(data.betaScore) : 75,
+          overallScore: data.overallScore !== undefined ? Number(data.overallScore) : 75,
+          pacingCategory: matchedKey,
+          pacingValue: pacingValue,
+        };
+      } else {
+        const rawText = data.text || "";
+        const sensoryMatch = rawText.match(/\[SENSORY CHECK\]\s*([\s\S]*?)(?=\[PACING|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i)
+          || rawText.match(/(?:1\.\s*)?Sensory Check\s*[\s\S]*?(?=\n\s*(?:2\.\s*)?(?:Pacing Audit|Pacing Report)|\n\s*(?:3\.\s*)?Beta Reader Critique|$)/i);
+
+        const pacingMatch = rawText.match(/\[PACING REPORT\]\s*([\s\S]*?)(?=\[BETA|\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i)
+          || rawText.match(/(?:2\.\s*)?Pacing Audit\s*[\s\S]*?(?=\n\s*(?:3\.\s*)?Beta Reader Critique|$)/i);
+
+        const betaMatch = rawText.match(/\[BETA READER CRITIQUE\]\s*([\s\S]*?)(?=\[SENSORY SCORE|\[PACING SCORE|\[BETA SCORE|\[OVERALL SCORE|\[PACING CATEGORY|$)/i)
+          || rawText.match(/(?:3\.\s*)?Beta Reader Critique\s*[\s\S]*?$/i);
+
+        const sensoryScoreMatch = rawText.match(/\[SENSORY SCORE\]\s*(\d+)/i) || rawText.match(/Sensory Score:\s*(\d+)/i);
+        const pacingScoreMatch = rawText.match(/\[PACING SCORE\]\s*(\d+)/i) || rawText.match(/Pacing Score:\s*(\d+)/i);
+        const betaScoreMatch = rawText.match(/\[BETA SCORE\]\s*(\d+)/i) || rawText.match(/Beta Score:\s*(\d+)/i);
+        const overallScoreMatch = rawText.match(/\[OVERALL SCORE\]\s*(\d+)/i) || rawText.match(/Overall Score:\s*(\d+)/i);
+        const pacingCategoryMatch = rawText.match(/\[PACING CATEGORY\]\s*([^\[\n\r]+)/i) || rawText.match(/Pacing Category:\s*([^\[\n\r]+)/i);
+
+        const rawCategory = pacingCategoryMatch ? pacingCategoryMatch[1].trim() : "Steady Pacing";
+        const matchedKey = Object.keys(scoreMapping).find(
+          (key) => key.toLowerCase() === rawCategory.replace(/['"“”]/g, "").trim().toLowerCase()
+        ) || "Steady Pacing";
+        const pacingValue = scoreMapping[matchedKey];
+
+        newAnalyticsResult = {
+          sensory: sensoryMatch ? (sensoryMatch[1] || sensoryMatch[0]).trim() : "Editorial Report Highlight:\n\n" + rawText,
+          sensoryScore: sensoryScoreMatch ? parseInt(sensoryScoreMatch[1], 10) : 75,
+          pacing: pacingMatch ? (pacingMatch[1] || pacingMatch[0]).trim() : "Comprehensive pace audit complete.",
+          pacingScore: pacingScoreMatch ? parseInt(pacingScoreMatch[1], 10) : 70,
+          beta: betaMatch ? (betaMatch[1] || betaMatch[0]).trim() : "Developmental critique done. Reviewing highlights.",
+          betaScore: betaScoreMatch ? parseInt(betaScoreMatch[1], 10) : 72,
+          overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : 73,
+          pacingCategory: matchedKey,
+          pacingValue: pacingValue,
+        };
+      }
+
+      setStory((prev) => {
+        const nextChapters = prev.chapters.map((c) =>
+          c.id === chapterId ? { ...c, analytics: newAnalyticsResult } : c
+        );
+        return {
+          ...prev,
+          chapters: nextChapters,
+        };
+      });
+
+      if (chapterId === story.activeChapterId) {
+        setAnalyticsResult(newAnalyticsResult);
+      }
+
+      showNotification(`Analysis complete for chapter "${ch.title}"!`);
+    } catch (e: any) {
+      console.error(e);
+      showNotification(`Analysis failed: ${e.message || "Unknown error"}`);
     }
   };
 
@@ -1029,6 +1142,14 @@ export default function App() {
               }`}
             >
               Writing Canvas
+            </button>
+            <button
+              onClick={() => setSelectedMainTab("flow")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-sans font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                selectedMainTab === "flow" ? "bg-white text-[#5A5A40] shadow-sm" : "text-[#88887e] hover:text-[#33332d]"
+              }`}
+            >
+              📊 Story Flow & Pacing
             </button>
             <button
               onClick={() => setSelectedMainTab("incubate")}
@@ -1754,6 +1875,49 @@ export default function App() {
                           Submit this chapter manuscript for a professional development edit. Gemini acts as an expert developmental editor to rate sensory ratios, pacing drag, and plot logic.
                         </p>
 
+                        <div className="space-y-2 pt-2 border-t border-[#f0efe9]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-sans font-bold text-[#5A5A40] uppercase tracking-wider block">
+                              Review Mode:
+                            </span>
+                            {(activeCh.analytics || analyticsResult) && (
+                              <span className="text-[8px] bg-emerald-50 text-emerald-700 border border-emerald-100 font-mono px-1.5 py-0.5 rounded">
+                                Has Previous Report
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#efeee8] rounded-xl">
+                            <button
+                              type="button"
+                              onClick={() => setAnalysisMode("progressive")}
+                              className={`py-1.5 text-[9.5px] uppercase tracking-wider font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                analysisMode === "progressive"
+                                  ? "bg-white text-[#5A5A40] shadow-xs"
+                                  : "text-[#88887e] hover:text-[#33332d]"
+                              }`}
+                            >
+                              🔄 Progressive (Merge)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAnalysisMode("fresh")}
+                              className={`py-1.5 text-[9.5px] uppercase tracking-wider font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                                analysisMode === "fresh"
+                                  ? "bg-white text-rose-700 shadow-xs"
+                                  : "text-[#88887e] hover:text-[#33332d]"
+                              }`}
+                            >
+                              ✨ Fresh Start
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-[#88887e] leading-snug">
+                            {analysisMode === "progressive" 
+                              ? "Evolves based on prior critiques. Acknowledges improvements and raises scores continuously without contradicting past notes." 
+                              : "Discards past critiques and performs a brand-new review from scratch."}
+                          </p>
+                        </div>
+
                         <button
                           onClick={handleAnalyzeChapter}
                           disabled={isAnalyzing || !activeCh.content.trim()}
@@ -1765,7 +1929,7 @@ export default function App() {
                             </>
                           ) : (
                             <>
-                              <BarChart2 className="w-3.5 h-3.5" /> Run Chapter Analytics
+                              <BarChart2 className="w-3.5 h-3.5" /> {(activeCh.analytics || analyticsResult) && analysisMode === "progressive" ? "Refine Chapter Review" : "Run Chapter Analytics"}
                             </>
                           )}
                         </button>
@@ -1951,6 +2115,20 @@ export default function App() {
               </div>
             </aside>
           </>
+        )}
+
+        {/* VIEW: STORY FLOW & PACING BLUEPRINT */}
+        {selectedMainTab === "flow" && (
+          <div className="flex-1 bg-[#fbfbf9] p-6 md:p-8 overflow-y-auto">
+            <StoryFlowTab
+              story={story}
+              onSelectChapter={(id) => {
+                setStory(prev => ({ ...prev, activeChapterId: id }));
+                setSelectedMainTab("canvas");
+              }}
+              onRunChapterAnalysis={handleAnalyzeSpecificChapter}
+            />
+          </div>
         )}
 
         {/* VIEW 2: STORY INCUBATION */}
