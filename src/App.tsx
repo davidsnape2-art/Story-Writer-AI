@@ -33,9 +33,6 @@ import { Story, Character, OutlineItem, SidebarTab, AiTab, LoreBookItem } from "
 import { INITIAL_STORY, GENRES, TONES } from "./data";
 
 // Import custom sub-modules
-import StoryStarterTab from "./components/StoryStarterTab";
-import WorldBuilderTab from "./components/WorldBuilderTab";
-import CharacterTab from "./components/CharacterTab";
 import RefinementPanel from "./components/RefinementPanel";
 import CoWriterChat from "./components/CoWriterChat";
 import StoryFlowTab from "./components/StoryFlowTab";
@@ -52,7 +49,7 @@ export default function App() {
     }
   });
 
-  const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "incubate" | "world" | "characters" | "flow">("canvas");
+  const [selectedMainTab, setSelectedMainTab] = useState<"canvas" | "flow">("canvas");
   const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline" | "lore">("structure");
   const [rightPanelTab, setRightPanelTab] = useState<AiTab>("refine");
 
@@ -1151,30 +1148,6 @@ export default function App() {
             >
               📊 Story Flow & Pacing
             </button>
-            <button
-              onClick={() => setSelectedMainTab("incubate")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-sans font-medium transition-colors cursor-pointer ${
-                selectedMainTab === "incubate" ? "bg-white text-[#5A5A40] shadow-sm" : "text-[#88887e] hover:text-[#33332d]"
-              }`}
-            >
-              Incubate Ideas
-            </button>
-            <button
-              onClick={() => setSelectedMainTab("world")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-sans font-medium transition-colors cursor-pointer ${
-                selectedMainTab === "world" ? "bg-white text-[#5A5A40] shadow-sm" : "text-[#88887e] hover:text-[#33332d]"
-              }`}
-            >
-              World Setting
-            </button>
-            <button
-              onClick={() => setSelectedMainTab("characters")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-sans font-medium transition-colors cursor-pointer ${
-                selectedMainTab === "characters" ? "bg-white text-[#5A5A40] shadow-sm" : "text-[#88887e] hover:text-[#33332d]"
-              }`}
-            >
-              Character Bible
-            </button>
           </nav>
 
           <div className="flex items-center gap-4">
@@ -1320,7 +1293,7 @@ export default function App() {
                     leftSidebarTab === "structure" ? "border-[#5A5A40] text-[#5A5A40]" : "border-transparent text-[#a1a19a]"
                   }`}
                 >
-                  Beats & Cast
+                  Guide
                 </button>
                 <button
                   onClick={() => setLeftSidebarTab("outline")}
@@ -1343,45 +1316,12 @@ export default function App() {
               {/* Left sidebar widgets */}
               {leftSidebarTab === "structure" && (
                 <div className="space-y-4">
-                  {/* Character Bible mini index */}
-                  <div className="bg-[#ecece4]/60 p-3.5 rounded-xl border border-[#dcdcd4]">
-                    <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider mb-2.5 text-[#5A5A40]">
-                      Cast references ({story.characters.length})
-                    </h4>
-                    {story.characters.length > 0 ? (
-                      <div className="space-y-2">
-                        {story.characters.map((char) => (
-                          <div
-                            key={char.id}
-                            onClick={() => handleInsertCharacterSnippet(char)}
-                            className="group flex items-center justify-between p-1 px-2 rounded bg-white hover:bg-[#5A5A40]/10 border border-[#efeee8] cursor-pointer transition-colors"
-                            title="Click to place character description into draft"
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#a3b18a]" />
-                              <span className="text-xs text-[#33332d] group-hover:text-[#5A5A40] font-sans font-medium truncate max-w-[140px]">
-                                {char.name}
-                              </span>
-                            </div>
-                            <span className="text-[8px] font-mono text-[#a1a19a] opacity-0 group-hover:opacity-100 transition-opacity">
-                              Introduces
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-[#88887e] italic leading-relaxed">
-                        No actors generated yet. Go to Character Bible tab to summon them.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="p-3 bg-[#fcfcf9] rounded-xl border border-[#efeee8]">
-                    <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider text-[#a1a19a] mb-1">
-                      How to revise
+                  <div className="p-3.5 bg-[#fcfcf9] rounded-xl border border-[#efeee8]">
+                    <h4 className="font-sans text-[9px] font-bold uppercase tracking-wider text-[#5A5A40] mb-1.5">
+                      How to revise & refine
                     </h4>
                     <p className="text-[10px] text-[#88887e] leading-relaxed">
-                      Input or write your chapter in the center, highlight any text, and choose a refinement vector inside the Assistant tab.
+                      Type or paste your chapter in the center, highlight any text, and choose a refinement vector inside the Assistant tab on the right side to surgically polish your prose.
                     </p>
                   </div>
                 </div>
@@ -2128,62 +2068,6 @@ export default function App() {
               }}
               onRunChapterAnalysis={handleAnalyzeSpecificChapter}
             />
-          </div>
-        )}
-
-        {/* VIEW 2: STORY INCUBATION */}
-        {selectedMainTab === "incubate" && (
-          <div className="flex-1 bg-white p-6 md:p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto space-y-4">
-              <div className="border-b border-[#efeee8] pb-4 mb-4">
-                <span className="font-sans text-[11px] text-[#88887e] tracking-widest uppercase block mb-1">
-                  Idea Generation Suite
-                </span>
-                <h2 className="font-display font-medium text-2xl text-[#1a1a15] italic">
-                  Cultivate Story Starters
-                </h2>
-              </div>
-              <StoryStarterTab onUseStarter={handleUseStarter} />
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 3: FICTIONAL WORLD FORGE */}
-        {selectedMainTab === "world" && (
-          <div className="flex-1 bg-white p-6 md:p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto space-y-4">
-              <div className="border-b border-[#efeee8] pb-4 mb-4">
-                <span className="font-sans text-[11px] text-[#88887e] tracking-widest uppercase block mb-1">
-                  Geography & Lore Forge
-                </span>
-                <h2 className="font-display font-medium text-2xl text-[#1a1a15] italic">
-                  Generate Fictional Realms
-                </h2>
-              </div>
-              <WorldBuilderTab />
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 4: CHARACTER BIBLE */}
-        {selectedMainTab === "characters" && (
-          <div className="flex-1 bg-white p-6 md:p-8 overflow-y-auto">
-            <div className="max-w-7xl mx-auto space-y-4">
-              <div className="border-b border-[#efeee8] pb-4 mb-4">
-                <span className="font-sans text-[11px] text-[#88887e] tracking-widest uppercase block mb-1">
-                  Cast & Protagonists
-                </span>
-                <h2 className="font-display font-medium text-2xl text-[#1a1a15] italic">
-                  The Character Bible
-                </h2>
-              </div>
-              <CharacterTab
-                characters={story.characters}
-                onAddCharacter={handleAddCharacter}
-                onDeleteCharacter={handleDeleteCharacter}
-                onSelectCharacterForCanvas={handleInsertCharacterSnippet}
-              />
-            </div>
           </div>
         )}
       </div>
