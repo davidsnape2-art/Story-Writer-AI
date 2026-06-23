@@ -98,10 +98,24 @@ export default function StoryFlowTab({
     if (isFlowLoading || story.chapters.length === 0) return;
     setIsFlowLoading(true);
     try {
+      // Map chapters to flag those that have changed since their analytics were captured
+      const preparedChapters = story.chapters.map(ch => {
+        const matchingAnalyzed = analyzedChapters.find(a => a.id === ch.id);
+        const isChapterTextStale = !matchingAnalyzed || (ch.content || "").length !== matchingAnalyzed.length || ch.title !== matchingAnalyzed.title;
+        
+        return {
+          ...ch,
+          analytics: ch.analytics ? {
+            ...ch.analytics,
+            isStale: isChapterTextStale || (ch.analytics as any).isStale
+          } : undefined
+        };
+      });
+
       const response = await fetch("/api/gemini/analyze-story-flow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapters: story.chapters }),
+        body: JSON.stringify({ chapters: preparedChapters }),
       });
 
       if (!response.ok) {

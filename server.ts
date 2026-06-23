@@ -287,11 +287,12 @@ function generateRuleBasedStoryFlow(chapters: any[]): any {
     const dialogueHits = (content.match(/"/g) || []).length / 2;
     const betaScore = Math.max(15, Math.min(100, 50 + dialogueHits * 6));
 
-    const chOverall = ch.analytics?.overallScore;
-    const chSensory = ch.analytics?.sensoryScore;
-    const chPacing = ch.analytics?.pacingScore;
-    const chBeta = ch.analytics?.betaScore;
-    const chCategory = ch.analytics?.pacingCategory;
+    const isStale = ch.analytics?.isStale;
+    const chOverall = isStale ? undefined : ch.analytics?.overallScore;
+    const chSensory = isStale ? undefined : ch.analytics?.sensoryScore;
+    const chPacing = isStale ? undefined : ch.analytics?.pacingScore;
+    const chBeta = isStale ? undefined : ch.analytics?.betaScore;
+    const chCategory = isStale ? undefined : ch.analytics?.pacingCategory;
 
     return {
       index: index + 1,
@@ -1068,13 +1069,63 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
         ? summaryContent.substring(0, 1000) + "\n\n[...]\n\n" + summaryContent.substring(summaryContent.length - 1000)
         : summaryContent;
 
-      const scores = ch.analytics ? {
-        overall: ch.analytics.overallScore,
-        sensory: ch.analytics.sensoryScore,
-        pacing: ch.analytics.pacingScore,
-        beta: ch.analytics.betaScore,
-        pacingCategory: ch.analytics.pacingCategory,
-      } : "No individual chapter analysis run yet.";
+      const isStale = ch.analytics?.isStale;
+      let overall = ch.analytics?.overallScore;
+      let sensory = ch.analytics?.sensoryScore;
+      let pacing = ch.analytics?.pacingScore;
+      let beta = ch.analytics?.betaScore;
+      let pacingCategory = ch.analytics?.pacingCategory;
+
+      if (!ch.analytics || isStale) {
+        // Run rule-based calculations on the fly to get fresh context
+        const words = summaryContent.split(/\s+/).filter(Boolean);
+        const sightWords = ["saw", "look", "see", "gaze", "stare", "gleam", "dark", "bright", "color", "red", "blue", "glowing", "shadow", "glare", "peer", "view"];
+        const soundWords = ["heard", "sound", "listen", "noise", "whisper", "shout", "clanc", "rumble", "echo", "silent", "quiet", "roar", "muffle", "hiss", "shriek"];
+        const touchWords = ["felt", "touch", "cold", "warm", "hot", "rough", "smooth", "soft", "sharp", "heavy", "press", "grip", "breeze", "chill", "pain"];
+        const smellTasteWords = ["smell", "scent", "odor", "fragran", "aroma", "taste", "sweet", "bitter", "sour", "salty", "flavor", "delicious", "stinch", "perfume"];
+
+        let sightCount = 0, soundCount = 0, touchCount = 0, smellTasteCount = 0;
+        words.forEach(w => {
+          const lw = w.toLowerCase();
+          if (sightWords.some(sw => lw.includes(sw))) sightCount++;
+          if (soundWords.some(sw => lw.includes(sw))) soundCount++;
+          if (touchWords.some(sw => lw.includes(sw))) touchCount++;
+          if (smellTasteWords.some(st => lw.includes(st))) smellTasteCount++;
+        });
+
+        const sensoryHits = sightCount + soundCount + touchCount + smellTasteCount;
+        sensory = Math.max(15, Math.min(100, 35 + sensoryHits * 5));
+
+        const sentences = summaryContent.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const avgSentenceLength = sentences.length > 0 ? wordCount / sentences.length : 0;
+
+        if (avgSentenceLength > 22) {
+          pacingCategory = "Slow Burn";
+          pacing = 55;
+        } else if (avgSentenceLength < 10 && wordCount > 30) {
+          pacingCategory = "Breakneck / Intense";
+          pacing = 60;
+        } else if (wordCount > 0) {
+          pacingCategory = "Highly Engaging";
+          pacing = 85;
+        } else {
+          pacingCategory = "Flat / Static";
+          pacing = 30;
+        }
+
+        const dialogueHits = (summaryContent.match(/"/g) || []).length / 2;
+        beta = Math.max(15, Math.min(100, 50 + dialogueHits * 6));
+        overall = Math.round((sensory + pacing + beta) / 3);
+      }
+
+      const scores = {
+        overall,
+        sensory,
+        pacing,
+        beta,
+        pacingCategory,
+        isStale: !!isStale
+      };
 
       return {
         index: index + 1,
