@@ -52,8 +52,24 @@ export default function StoryFlowTab({
       return null;
     }
   });
+  const [analyzedChapters, setAnalyzedChapters] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(`ai_story_flow_chapters_${story.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const [analyzingChapterId, setAnalyzingChapterId] = useState<string | null>(null);
+
+  // Stale detection
+  const currentChaptersSummary = story.chapters.map(c => ({
+    id: c.id,
+    length: (c.content || "").length,
+    title: c.title
+  }));
+  const isReportStale = flowReport && JSON.stringify(currentChaptersSummary) !== JSON.stringify(analyzedChapters);
 
   // Compute stats across chapters
   const ratedChapters = story.chapters.filter(ch => ch.analytics?.[activeMetric] !== undefined);
@@ -95,6 +111,13 @@ export default function StoryFlowTab({
       const data = await response.json();
       setFlowReport(data);
       localStorage.setItem(`ai_story_flow_report_${story.id}`, JSON.stringify(data));
+      const chapterSummary = story.chapters.map(c => ({
+        id: c.id,
+        length: (c.content || "").length,
+        title: c.title
+      }));
+      localStorage.setItem(`ai_story_flow_chapters_${story.id}`, JSON.stringify(chapterSummary));
+      setAnalyzedChapters(chapterSummary);
     } catch (error) {
       console.error("Story flow analysis critical error:", error);
     } finally {
@@ -189,6 +212,33 @@ export default function StoryFlowTab({
           )}
         </button>
       </div>
+      
+      {isReportStale && flowReport && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+            <div className="text-xs">
+              <span className="font-semibold text-amber-950 block sm:inline">Manuscript changes detected!</span>{" "}
+              The content of your draft chapters has changed since your last flow audit. Update your diagnosis to recalculate your story coherence rating and actionable roadmap.
+            </div>
+          </div>
+          <button
+            onClick={handleAnalyzeStoryFlow}
+            disabled={isFlowLoading}
+            className="self-start sm:self-center px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white font-sans font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+          >
+            {isFlowLoading ? (
+              <>
+                <RefreshCw className="w-3 h-3 animate-spin" /> Updating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-3 h-3" /> Update Diagnosis
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* METRIC CARD STATS GRID */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

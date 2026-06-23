@@ -193,13 +193,56 @@ Overall structural layout is consistent.
   };
 }
 
+// Helper to extract character names
+function extractCharacterNames(content: string): string[] {
+  if (!content) return [];
+  const words = content.split(/[\s,.:;?!"'()]+/);
+  const names = new Set<string>();
+  const stopWords = new Set([
+    "The", "And", "But", "For", "Nor", "Yet", "She", "They", "Then", "This", "That", "There", "Here", 
+    "With", "From", "What", "When", "Where", "Who", "Whom", "Whose", "Which", "Why", "How", "Once", 
+    "While", "After", "Before", "Although", "Though", "Because", "Since", "Unless", "Until", "If", 
+    "Whether", "You", "I", "He", "We", "His", "Her", "Their", "Our", "My", "Your", "Its", "Not", "No", 
+    "Yes", "All", "Any", "One", "Two", "Some", "Like", "Just", "Into", "Down", "Over", "Back", "Out",
+    "Now", "Very", "Only", "About", "More", "Even", "Than", "Then", "Also", "Well", "Just"
+  ]);
+  
+  words.forEach(w => {
+    // Matches capitalized words that are 3-12 letters long
+    if (w.length >= 3 && w.length <= 12 && /^[A-Z][a-z]+$/.test(w)) {
+      if (!stopWords.has(w)) {
+        names.add(w);
+      }
+    }
+  });
+  return Array.from(names).slice(0, 5); // Limit to top 5 names
+}
+
 // Fallback rule-based multi-chapter story flow analyzer if all Gemini models are overloaded
 function generateRuleBasedStoryFlow(chapters: any[]): any {
+  // Extract global information across all chapters
+  let allCharacters = new Set<string>();
+  let sciFiKeywords = 0;
+  let fantasyKeywords = 0;
+  let mysteryKeywords = 0;
+  let romanceKeywords = 0;
+
   const chapterDetails = chapters.map((ch, index) => {
     const title = ch.title || `Chapter ${index + 1}`;
     const content = ch.content || "";
     const words = content.split(/\s+/).filter(Boolean);
     const wordCount = words.length;
+
+    // Detect characters in this chapter
+    const chChars = extractCharacterNames(content);
+    chChars.forEach(c => allCharacters.add(c));
+
+    // Keyword theme counts
+    const lc = content.toLowerCase();
+    sciFiKeywords += (lc.match(/(ship|space|star|laser|computer|device|engine|metal|screen|drone|tech|planet|galaxy|cyber)/g) || []).length;
+    fantasyKeywords += (lc.match(/(sword|magic|spell|castle|shield|king|queen|beast|stone|ancient|wizard|elf|dwarf|rune)/g) || []).length;
+    mysteryKeywords += (lc.match(/(blood|gun|killer|clue|dark|secret|crime|police|knife|shadow|detective|case|murder|suspect)/g) || []).length;
+    romanceKeywords += (lc.match(/(heart|love|smile|tears|eyes|whisper|hand|feel|touch|gentle|kiss|embrace|passion|sigh)/g) || []).length;
 
     // Run quick local analysis of sensory/pacing to have live data
     const sightWords = ["saw", "look", "see", "gaze", "stare", "gleam", "dark", "bright", "color", "red", "blue", "glowing", "shadow", "glare", "peer", "view"];
@@ -261,6 +304,8 @@ function generateRuleBasedStoryFlow(chapters: any[]): any {
       betaScore: chBeta !== undefined ? Number(chBeta) : betaScore,
       overallScore: chOverall !== undefined ? Number(chOverall) : Math.round((sensoryScore + pacingScore + betaScore) / 3),
       avgSentenceLength,
+      dialogueHits,
+      characters: chChars,
     };
   });
 
@@ -268,18 +313,46 @@ function generateRuleBasedStoryFlow(chapters: any[]): any {
   const totalWords = chapterDetails.reduce((acc, c) => acc + c.wordCount, 0);
   const avgWords = totalChapters > 0 ? Math.round(totalWords / totalChapters) : 0;
 
-  // Find lowest and highest sensory/pacing chapters
-  let lowestSensory = chapterDetails[0] || { index: 1, title: "Draft", sensoryScore: 50 };
-  let highestSensory = chapterDetails[0] || { index: 1, title: "Draft", sensoryScore: 50 };
-  let slowestPacing = chapterDetails[0] || { index: 1, title: "Draft", pacingScore: 50, pacingCategory: "Steady Pacing" };
-  let fastestPacing = chapterDetails[0] || { index: 1, title: "Draft", pacingScore: 50, pacingCategory: "Steady Pacing" };
+  // Find lowest/highest indicators
+  let lowestSensory = chapterDetails[0] || ({ index: 1, title: "Draft", sensoryScore: 50, characters: [] as string[] } as any);
+  let highestSensory = chapterDetails[0] || ({ index: 1, title: "Draft", sensoryScore: 50, characters: [] as string[] } as any);
+  let slowestPacing = chapterDetails[0] || ({ index: 1, title: "Draft", pacingScore: 50, pacingCategory: "Steady Pacing", avgSentenceLength: 15, characters: [] as string[] } as any);
+  let fastestPacing = chapterDetails[0] || ({ index: 1, title: "Draft", pacingScore: 50, pacingCategory: "Steady Pacing", characters: [] as string[] } as any);
+  let lowestDialogue = chapterDetails[0] || ({ index: 1, title: "Draft", dialogueHits: 0, characters: [] as string[] } as any);
 
   chapterDetails.forEach(c => {
     if (c.sensoryScore < lowestSensory.sensoryScore) lowestSensory = c;
     if (c.sensoryScore > highestSensory.sensoryScore) highestSensory = c;
     if (c.pacingScore < slowestPacing.pacingScore) slowestPacing = c;
     if (c.pacingScore > fastestPacing.pacingScore) fastestPacing = c;
+    if (c.dialogueHits < lowestDialogue.dialogueHits) lowestDialogue = c;
   });
+
+  // Determine dominant genre theme based on keywords
+  let detectedGenre = "General Fiction";
+  let genreAdjective = "narrative";
+  let environmentalTip = "visual elements and acoustic atmosphere";
+
+  const maxKeywords = Math.max(sciFiKeywords, fantasyKeywords, mysteryKeywords, romanceKeywords);
+  if (maxKeywords > 2) {
+    if (sciFiKeywords === maxKeywords) {
+      detectedGenre = "Science Fiction";
+      genreAdjective = "speculative tech-driven";
+      environmentalTip = "metallic machinery acoustics, low-hum ambient power grids, or futuristic display glows";
+    } else if (fantasyKeywords === maxKeywords) {
+      detectedGenre = "Fantasy";
+      genreAdjective = "vivid mythical";
+      environmentalTip = "crackling torch fires, ancient stone textures, or high-density magical aura pressure";
+    } else if (mysteryKeywords === maxKeywords) {
+      detectedGenre = "Mystery / Thriller";
+      genreAdjective = "tense suspenseful";
+      environmentalTip = "shifting dark shadows, sudden sharp metallic sounds, or heavy chilly rain on cold pavement";
+    } else if (romanceKeywords === maxKeywords) {
+      detectedGenre = "Romance / Drama";
+      genreAdjective = "deeply emotional and intimate";
+      environmentalTip = "warm soft candle light, the quiet rustle of linen, or a subtle scent of jasmine and rain";
+    }
+  }
 
   // Calculate dynamic coherence score
   let wcVarianceSum = 0;
@@ -288,9 +361,9 @@ function generateRuleBasedStoryFlow(chapters: any[]): any {
   });
   const wcDiscrepancyPercentage = avgWords > 0 ? (wcVarianceSum / totalChapters) / avgWords : 0;
 
-  let baseCoherence = 84;
-  if (wcDiscrepancyPercentage > 0.4) baseCoherence -= 10;
-  if (totalChapters < 3) baseCoherence -= 6;
+  let baseCoherence = 85;
+  if (wcDiscrepancyPercentage > 0.45) baseCoherence -= 12;
+  if (totalChapters < 3) baseCoherence -= 7;
 
   // Include some light random jitter based on text content hash so scores vary slightly and reactively
   let contentHash = 0;
@@ -303,10 +376,15 @@ function generateRuleBasedStoryFlow(chapters: any[]): any {
   const scoreJitter = (contentHash % 9) - 4; // -4 to +4
   const coherenceScore = Math.max(45, Math.min(98, Math.round(baseCoherence + scoreJitter)));
 
-  const flowOverview = `This dynamic report maps narrative progress across **${totalChapters} chapters** containing **${totalWords.toLocaleString()} words**. The structure currently demonstrates a **coherence rating of ${coherenceScore}%**. 
+  const characterList = Array.from(allCharacters);
+  const characterNamesStr = characterList.length > 0 
+    ? `featuring key characters like **${characterList.slice(0, 3).join(", ")}**` 
+    : "mapping individual character presence dynamically";
+
+  const flowOverview = `This dynamic report maps narrative progress across **${totalChapters} chapters** containing **${totalWords.toLocaleString()} words**, classified as **${detectedGenre}**. The current draft structure demonstrates a **coherence rating of ${coherenceScore}%** ${characterNamesStr}. 
 We evaluated character continuity, dialogue pacing, and exposition density across all segments to isolate critical polishing vectors.`;
 
-  const pacingDistribution = `The story exhibits a diverse tempo range. 
+  const pacingDistribution = `The story exhibits a diverse tempo range fitting a ${genreAdjective} structure. 
 The fastest pace belongs to **Chapter ${fastestPacing.index} ("${fastestPacing.title}")** with a dynamic, highly punchy cadence. 
 Conversely, **Chapter ${slowestPacing.index} ("${slowestPacing.title}")** acts as a reflective harbor, maintaining a deliberate and descriptive pacing velocity.`;
 
@@ -314,6 +392,7 @@ Conversely, **Chapter ${slowestPacing.index} ("${slowestPacing.title}")** acts a
 In contrast, **Chapter ${lowestSensory.index} ("${lowestSensory.title}")** registers a lower sensory score of **${lowestSensory.sensoryScore}%** and is at risk of "White Room Syndrome".`;
 
   const transitions = [];
+  let bumpyIdx = -1;
   for (let i = 0; i < totalChapters - 1; i++) {
     const ch = chapterDetails[i];
     const nextCh = chapterDetails[i + 1];
@@ -325,18 +404,26 @@ In contrast, **Chapter ${lowestSensory.index} ("${lowestSensory.title}")** regis
     let flowRating: "Jarring" | "Bumpy" | "Decent" | "Smooth" | "Masterful" = "Decent";
     let critique = "";
 
+    // Find characters present in both chapters
+    const commonChars = ch.characters.filter(x => nextCh.characters.includes(x));
+
     if (maxRatio > 3 && ch.wordCount > 100 && nextCh.wordCount > 100) {
       flowRating = "Bumpy";
+      bumpyIdx = i;
       critique = `The transition from "${ch.title}" to "${nextCh.title}" displays a major sizing disparity (${ch.wordCount} vs ${nextCh.wordCount} words). This sudden change in segment density can feel bumpy to readers. Consider balancing description blocks.`;
     } else if (ch.pacingCategory === "Breakneck / Intense" && nextCh.pacingCategory === "Slow Burn") {
       flowRating = "Jarring";
-      critique = `The pacing drops abruptly from the high-velocity climax of "${ch.title}" to the slower exposition of "${nextCh.title}". Soften this transition by adding reflective thoughts to the start of the second chapter.`;
-    } else if (Math.abs(ch.overallScore - nextCh.overallScore) < 12) {
+      bumpyIdx = i;
+      critique = `The pacing drops abruptly from the high-velocity climax of "${ch.title}" to the slower exposition of "${nextCh.title}". Soften this transition by adding reflective thoughts to the start of "${nextCh.title}".`;
+    } else if (commonChars.length > 0) {
       flowRating = "Masterful";
-      critique = `A seamless narrative bridge! The dramatic voice, environmental detail, and core character tension flow perfectly from the conclusion of "${ch.title}" straight into the opening lines of "${nextCh.title}".`;
-    } else {
+      critique = `A seamless narrative bridge! The dramatic voice, environmental detail, and core character tension of ${commonChars[0]} flow perfectly from the conclusion of "${ch.title}" straight into the opening lines of "${nextCh.title}".`;
+    } else if (Math.abs(ch.overallScore - nextCh.overallScore) < 12) {
       flowRating = "Smooth";
       critique = `A comfortable, highly engaging transition connects "${ch.title}" and "${nextCh.title}". Character motives flow logically, and readers are guided smoothly into the next phase of the plot.`;
+    } else {
+      flowRating = "Decent";
+      critique = `A continuous hand-off is maintained between "${ch.title}" and "${nextCh.title}". Check pacing and tension transitions to ensure the narrative voice moves organically across physical action beats without sudden jumps.`;
     }
 
     transitions.push({
@@ -347,11 +434,50 @@ In contrast, **Chapter ${lowestSensory.index} ("${lowestSensory.title}")** regis
     });
   }
 
-  const macroImprovementPlan = [
-    `Inject fresh sensory sights, ambient sounds, or textures into Chapter ${lowestSensory.index} ("${lowestSensory.title}") to match the high immersion of Chapter ${highestSensory.index}.`,
-    `Refine sentence structure in Chapter ${slowestPacing.index} ("${slowestPacing.title}") to keep the reading cadence varied and engaging.`,
-    `Review transition hooks between successive chapters to ensure the narrative voice flows organically across physical actions.`
-  ];
+  // Compile highly specific, randomized/customized improvement suggestions
+  const macroImprovementPlan: string[] = [];
+
+  // Suggestion 1: Sensory Tip
+  const lowestSensoryNameStr = lowestSensory.characters.length > 0 ? ` around ${lowestSensory.characters[0]}` : "";
+  macroImprovementPlan.push(
+    `Inject fresh sensory cues${lowestSensoryNameStr} into Chapter ${lowestSensory.index} ("${lowestSensory.title}") to match the high immersion of Chapter ${highestSensory.index}. Add specific environmental details like ${environmentalTip}.`
+  );
+
+  // Suggestion 2: Pacing/Sentence Length Tip
+  const slowestPacingNameStr = slowestPacing.characters.length > 0 ? ` centered on ${slowestPacing.characters[0]}` : "";
+  macroImprovementPlan.push(
+    `Refine sentence structure in Chapter ${slowestPacing.index} ("${slowestPacing.title}")${slowestPacingNameStr}. Break down complex clauses (currently averaging ${slowestPacing.avgSentenceLength.toFixed(1)} words/sentence) with brief, decisive assertions to accelerate the cadence.`
+  );
+
+  // Suggestion 3: Dialogue Tip
+  if (lowestDialogue.dialogueHits < 2 && lowestDialogue.wordCount > 50) {
+    macroImprovementPlan.push(
+      `Introduce a dynamic dialogue exchange in Chapter ${lowestDialogue.index} ("${lowestDialogue.title}"). Authentic character voices will help break up dense exposition blocks and show active conflict.`
+    );
+  } else {
+    // General Character Consistency Tip
+    const characterToUse = characterList[0] || "your main protagonist";
+    macroImprovementPlan.push(
+      `Audit the consistency of ${characterToUse}'s goals. Ensure their motivations are active and clear across both slow expository scenes and fast climax sequences.`
+    );
+  }
+
+  // Suggestion 4: Transition Tip
+  if (bumpyIdx !== -1 && bumpyIdx < transitions.length) {
+    const bTrans = transitions[bumpyIdx];
+    macroImprovementPlan.push(
+      `Smooth out the transition from "${bTrans.fromChapter}" to "${bTrans.toChapter}" (rated as ${bTrans.flowRating}). Insert a clear narrative hook or spatial transition line to make this shift feel natural.`
+    );
+  } else if (totalChapters > 1) {
+    const lastCh = chapterDetails[totalChapters - 1];
+    macroImprovementPlan.push(
+      `Generate a stronger cliffhanger or unanswered question at the end of Chapter ${totalChapters} ("${lastCh.title}") to provide a compelling hook for your next manuscript segment.`
+    );
+  } else {
+    macroImprovementPlan.push(
+      `Add a second chapter to unlock transition evaluation, pacing wave analysis, and comparative sensory harmonization benchmarks.`
+    );
+  }
 
   return {
     coherenceScore,
