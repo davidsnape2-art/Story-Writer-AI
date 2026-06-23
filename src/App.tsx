@@ -37,6 +37,17 @@ import RefinementPanel from "./components/RefinementPanel";
 import CoWriterChat from "./components/CoWriterChat";
 import StoryFlowTab from "./components/StoryFlowTab";
 
+export function getContentHash(content: string): string {
+  if (!content) return "";
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
 export default function App() {
   // Primary app state - lazy initialization from LocalStorage
   const [story, setStory] = useState<Story>(() => {
@@ -476,6 +487,8 @@ export default function App() {
           overallScore: data.overallScore !== undefined ? Number(data.overallScore) : 75,
           pacingCategory: matchedKey,
           pacingValue: pacingValue,
+          contentHash: getContentHash(ch.content),
+          title: ch.title,
         };
       } else {
         const rawText = data.text || "";
@@ -510,6 +523,8 @@ export default function App() {
           overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : 73,
           pacingCategory: matchedKey,
           pacingValue: pacingValue,
+          contentHash: getContentHash(ch.content),
+          title: ch.title,
         };
       }
 

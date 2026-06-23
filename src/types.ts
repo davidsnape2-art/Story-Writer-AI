@@ -50,6 +50,9 @@ export interface Document {
     overallScore?: number;
     pacingCategory?: string;
     pacingValue?: number;
+    contentHash?: string;
+    title?: string;
+    isStale?: boolean;
   };
 }
 

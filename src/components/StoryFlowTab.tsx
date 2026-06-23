@@ -37,6 +37,17 @@ interface StoryFlowTabProps {
   onUpdateStory?: React.Dispatch<React.SetStateAction<Story>>;
 }
 
+function getContentHash(content: string): string {
+  if (!content) return "";
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
 export default function StoryFlowTab({ 
   story, 
   onSelectChapter, 
@@ -65,13 +76,11 @@ export default function StoryFlowTab({
 
   const [analyzingChapterId, setAnalyzingChapterId] = useState<string | null>(null);
 
-  // Stale detection
-  const currentChaptersSummary = story.chapters.map(c => ({
-    id: c.id,
-    length: (c.content || "").length,
-    title: c.title
-  }));
-  const isReportStale = flowReport && JSON.stringify(currentChaptersSummary) !== JSON.stringify(analyzedChapters);
+  // Robust Content Hash-based Stale detection
+  const hasStaleChapter = story.chapters.some(ch => {
+    return !ch.analytics || ch.analytics.contentHash !== getContentHash(ch.content) || ch.title !== ch.analytics.title;
+  });
+  const isReportStale = flowReport && hasStaleChapter;
 
   // Compute stats across chapters
   const ratedChapters = story.chapters.filter(ch => ch.analytics?.[activeMetric] !== undefined);
@@ -100,16 +109,15 @@ export default function StoryFlowTab({
     if (isFlowLoading || story.chapters.length === 0) return;
     setIsFlowLoading(true);
     try {
-      // Map chapters to flag those that have changed since their analytics were captured
+      // Map chapters using robust getContentHash to detect stale text
       const preparedChapters = story.chapters.map(ch => {
-        const matchingAnalyzed = analyzedChapters.find(a => a.id === ch.id);
-        const isChapterTextStale = !matchingAnalyzed || (ch.content || "").length !== matchingAnalyzed.length || ch.title !== matchingAnalyzed.title;
+        const isChapterTextStale = !ch.analytics || ch.analytics.contentHash !== getContentHash(ch.content) || ch.title !== ch.analytics.title;
         
         return {
           ...ch,
           analytics: ch.analytics ? {
             ...ch.analytics,
-            isStale: isChapterTextStale || (ch.analytics as any).isStale
+            isStale: isChapterTextStale
           } : undefined
         };
       });
@@ -126,30 +134,32 @@ export default function StoryFlowTab({
 
       const data = await response.json();
       
-      if (data.updatedChapters && onUpdateStory) {
-        onUpdateStory(prev => {
-          const nextChapters = prev.chapters.map(ch => {
-            const upCh = data.updatedChapters.find((u: any) => u.id === ch.id);
-            if (upCh) {
-              return {
-                ...ch,
-                analytics: upCh.analytics
-              };
-            }
-            return ch;
-          });
-          return {
-            ...prev,
-            chapters: nextChapters
-          };
+      let updatedChaptersList = story.chapters;
+      if (data.updatedChapters) {
+        updatedChaptersList = story.chapters.map(ch => {
+          const upCh = data.updatedChapters.find((u: any) => u.id === ch.id);
+          if (upCh) {
+            return {
+              ...ch,
+              analytics: upCh.analytics
+            };
+          }
+          return ch;
         });
+
+        if (onUpdateStory) {
+          onUpdateStory(prev => ({
+            ...prev,
+            chapters: updatedChaptersList
+          }));
+        }
       }
 
       setFlowReport(data);
       localStorage.setItem(`ai_story_flow_report_${story.id}`, JSON.stringify(data));
-      const chapterSummary = story.chapters.map(c => ({
+      const chapterSummary = updatedChaptersList.map(c => ({
         id: c.id,
-        length: (c.content || "").length,
+        contentHash: getContentHash(c.content),
         title: c.title
       }));
       localStorage.setItem(`ai_story_flow_chapters_${story.id}`, JSON.stringify(chapterSummary));

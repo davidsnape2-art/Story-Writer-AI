@@ -6,6 +6,17 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 dotenv.config();
 
+function getContentHash(content: string): string {
+  if (!content) return "";
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
+}
+
 const app = express();
 const PORT = 3000;
 
@@ -1069,14 +1080,24 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
         ? summaryContent.substring(0, 1000) + "\n\n[...]\n\n" + summaryContent.substring(summaryContent.length - 1000)
         : summaryContent;
 
-      const isStale = ch.analytics?.isStale;
+      const chHash = getContentHash(summaryContent);
+
+      const hasScores = 
+        ch.analytics &&
+        typeof ch.analytics.overallScore === "number" &&
+        typeof ch.analytics.sensoryScore === "number" &&
+        typeof ch.analytics.pacingScore === "number" &&
+        typeof ch.analytics.betaScore === "number" &&
+        ch.analytics.pacingCategory;
+
+      const isStale = !hasScores || ch.analytics?.isStale;
       let overall = ch.analytics?.overallScore;
       let sensory = ch.analytics?.sensoryScore;
       let pacing = ch.analytics?.pacingScore;
       let beta = ch.analytics?.betaScore;
       let pacingCategory = ch.analytics?.pacingCategory;
 
-      if (!ch.analytics || isStale) {
+      if (!hasScores || isStale) {
         // Run rule-based calculations on the fly to get fresh context
         const words = summaryContent.split(/\s+/).filter(Boolean);
         const sightWords = ["saw", "look", "see", "gaze", "stare", "gleam", "dark", "bright", "color", "red", "blue", "glowing", "shadow", "glare", "peer", "view"];
@@ -1134,6 +1155,7 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
         wordCount,
         scores,
         manuscriptSnippet: snippet,
+        contentHash: chHash,
       };
     });
 
@@ -1237,6 +1259,8 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
             overallScore: c.scores.overall,
             pacingCategory: c.scores.pacingCategory,
             pacingValue: c.scores.pacing,
+            contentHash: c.contentHash,
+            title: c.title,
           }
         }))
       });
@@ -1259,6 +1283,8 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
             overallScore: c.scores.overall,
             pacingCategory: c.scores.pacingCategory,
             pacingValue: c.scores.pacing,
+            contentHash: c.contentHash,
+            title: c.title,
           }
         }))
       });
