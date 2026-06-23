@@ -1223,13 +1223,45 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
         }
       }
       const data = JSON.parse(rawText);
-      res.json(data);
+      res.json({
+        ...data,
+        updatedChapters: chaptersContext.map(c => ({
+          id: c.id,
+          analytics: {
+            sensory: `Sensory Score: ${c.scores.sensory}%`,
+            sensoryScore: c.scores.sensory,
+            pacing: `Pacing Category: ${c.scores.pacingCategory}`,
+            pacingScore: c.scores.pacing,
+            beta: `Beta Score: ${c.scores.beta}%`,
+            betaScore: c.scores.beta,
+            overallScore: c.scores.overall,
+            pacingCategory: c.scores.pacingCategory,
+            pacingValue: c.scores.pacing,
+          }
+        }))
+      });
     } catch (apiError: any) {
       console.warn("[Gemini API] Macro flow analysis failed. Initiating localized high-availability fallback.");
       console.error(apiError);
       
       const localFallback = generateRuleBasedStoryFlow(chapters);
-      res.json(localFallback);
+      res.json({
+        ...localFallback,
+        updatedChapters: chaptersContext.map(c => ({
+          id: c.id,
+          analytics: {
+            sensory: `Sensory Score: ${c.scores.sensory}%`,
+            sensoryScore: c.scores.sensory,
+            pacing: `Pacing Category: ${c.scores.pacingCategory}`,
+            pacingScore: c.scores.pacing,
+            beta: `Beta Score: ${c.scores.beta}%`,
+            betaScore: c.scores.beta,
+            overallScore: c.scores.overall,
+            pacingCategory: c.scores.pacingCategory,
+            pacingValue: c.scores.pacing,
+          }
+        }))
+      });
     }
   } catch (outerError: any) {
     console.error("Critical error in analyze-story-flow route:", outerError);

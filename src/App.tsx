@@ -2067,6 +2067,7 @@ export default function App() {
                 setSelectedMainTab("canvas");
               }}
               onRunChapterAnalysis={handleAnalyzeSpecificChapter}
+              onUpdateStory={setStory}
             />
           </div>
         )}

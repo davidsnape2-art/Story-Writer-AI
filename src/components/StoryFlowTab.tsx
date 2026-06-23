@@ -34,12 +34,14 @@ interface StoryFlowTabProps {
   story: Story;
   onSelectChapter: (id: string) => void;
   onRunChapterAnalysis: (id: string) => Promise<void>;
+  onUpdateStory?: React.Dispatch<React.SetStateAction<Story>>;
 }
 
 export default function StoryFlowTab({ 
   story, 
   onSelectChapter, 
-  onRunChapterAnalysis 
+  onRunChapterAnalysis,
+  onUpdateStory
 }: StoryFlowTabProps) {
   const [activeMetric, setActiveMetric] = useState<"overallScore" | "sensoryScore" | "pacingScore" | "betaScore">("overallScore");
   const [hoveredChapter, setHoveredChapter] = useState<Document | null>(null);
@@ -123,6 +125,26 @@ export default function StoryFlowTab({
       }
 
       const data = await response.json();
+      
+      if (data.updatedChapters && onUpdateStory) {
+        onUpdateStory(prev => {
+          const nextChapters = prev.chapters.map(ch => {
+            const upCh = data.updatedChapters.find((u: any) => u.id === ch.id);
+            if (upCh) {
+              return {
+                ...ch,
+                analytics: upCh.analytics
+              };
+            }
+            return ch;
+          });
+          return {
+            ...prev,
+            chapters: nextChapters
+          };
+        });
+      }
+
       setFlowReport(data);
       localStorage.setItem(`ai_story_flow_report_${story.id}`, JSON.stringify(data));
       const chapterSummary = story.chapters.map(c => ({
