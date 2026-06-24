@@ -341,6 +341,8 @@ export default function App() {
           overallScore: data.overallScore !== undefined ? Number(data.overallScore) : 75,
           pacingCategory: matchedKey,
           pacingValue: pacingValue,
+          contentHash: getContentHash(activeCh.content),
+          title: activeCh.title,
         };
       } else {
         // Resilient fallback: handles raw text, failed JSON parse, or unstructured responses
@@ -377,6 +379,8 @@ export default function App() {
             overallScore: jsonParsed.overallScore !== undefined ? Number(jsonParsed.overallScore) : 75,
             pacingCategory: matchedKey,
             pacingValue: pacingValue,
+            contentHash: getContentHash(activeCh.content),
+            title: activeCh.title,
           };
         } else {
           // Structured text regex matching for different output variations
@@ -411,6 +415,8 @@ export default function App() {
             overallScore: overallScoreMatch ? parseInt(overallScoreMatch[1], 10) : 73,
             pacingCategory: matchedKey,
             pacingValue: pacingValue,
+            contentHash: getContentHash(activeCh.content),
+            title: activeCh.title,
           };
         }
       }

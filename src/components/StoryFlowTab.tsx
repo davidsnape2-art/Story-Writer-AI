@@ -665,9 +665,9 @@ export default function StoryFlowTab({
               const nextCh = story.chapters[idx + 1];
               
               // Find matching transition from generated report
-              const transitionRecord = flowReport?.transitions?.find(
-                t => t.fromChapter.toLowerCase().includes(ch.title?.toLowerCase().trim()) ||
-                     ch.title?.toLowerCase().trim().includes(t.fromChapter.toLowerCase().trim())
+              const transitionRecord = flowReport?.transitions?.[idx] || flowReport?.transitions?.find(
+                t => t.fromChapter?.toLowerCase().includes(ch.title?.toLowerCase().trim()) ||
+                     ch.title?.toLowerCase().trim().includes(t.fromChapter?.toLowerCase().trim())
               );
 
               return (
