@@ -1273,7 +1273,7 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
               overallScore: c.scores.overall,
               pacingCategory: c.scores.pacingCategory,
               pacingValue: c.scores.pacing,
-              contentHash: origAnalytics.contentHash || c.contentHash,
+              contentHash: c.contentHash,
               title: c.title,
             }
           };
@@ -1302,7 +1302,7 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
               overallScore: c.scores.overall,
               pacingCategory: c.scores.pacingCategory,
               pacingValue: c.scores.pacing,
-              contentHash: origAnalytics.contentHash || c.contentHash,
+              contentHash: c.contentHash,
               title: c.title,
             }
           };

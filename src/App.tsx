@@ -230,6 +230,16 @@ export default function App() {
   // Active Chapter resolution
   const activeChapterId = story.activeChapterId || (story.chapters[0]?.id) || "chapter-1";
   const activeCh = story.chapters.find((c) => c.id === activeChapterId) || story.chapters[0] || { id: "chapter-1", title: "Chapter 1", content: "" };
+
+  // Sync analyticsResult with current active chapter analytics when they change (e.g. from story flow)
+  useEffect(() => {
+    if (activeCh && activeCh.analytics) {
+      setAnalyticsResult(activeCh.analytics);
+    } else {
+      setAnalyticsResult(null);
+    }
+  }, [activeCh?.analytics]);
+
   const isDiagnosticStale = !!(analyticsResult && analyticsResult.contentHash !== getContentHash(activeCh.content));
 
   // Sync state stats based directly on the active chapter content
