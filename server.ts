@@ -710,7 +710,7 @@ app.post("/api/gemini/chat", async (req, res) => {
 // 5.5. Editorial Chapter Analytics (Sensory Check, Pacing, Beta Critique)
 app.post("/api/gemini/analyze-chapter", async (req, res) => {
   try {
-    const { content, previousAnalysis, mode } = req.body;
+    const { content, previousAnalysis, mode, model } = req.body;
     if (!content || !content.trim()) {
       return res.status(400).json({ error: "Chapter manuscript content is required for analysis." });
     }
@@ -786,7 +786,7 @@ app.post("/api/gemini/analyze-chapter", async (req, res) => {
     let response;
     try {
       response = await generateContentWithRetry({
-        model: "gemini-3.5-flash",
+        model: model || "gemini-3.5-flash",
         contents: analysisPrompt,
         config: {
           systemInstruction: "You are an award-winning creative writing instructor and structural book critique partner. Provide helpful, precise, objective, and constructive advice without generic praise. Focus purely on literary enhancements.",
@@ -1074,7 +1074,7 @@ Generate:
 // 5.6. Macro Story Flow & Chapter Transition Analyst
 app.post("/api/gemini/analyze-story-flow", async (req, res) => {
   try {
-    const { chapters } = req.body;
+    const { chapters, model } = req.body;
     if (!chapters || !Array.isArray(chapters) || chapters.length === 0) {
       return res.status(400).json({ error: "Story chapters list is required to evaluate overall flow." });
     }
@@ -1188,7 +1188,7 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
     let response;
     try {
       response = await generateContentWithRetry({
-        model: "gemini-3.5-flash",
+        model: model || "gemini-3.5-flash",
         contents: flowPrompt,
         config: {
           systemInstruction: "You are an elite narrative design consultant. You critique full-length novels and manuscripts, providing helpful, objective developmental feedback on structure, chapter handoffs, transitions, and flow continuity.",

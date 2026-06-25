@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Story, Document } from "../types";
 import { 
   Activity, 
@@ -74,6 +74,8 @@ export default function StoryFlowTab({
     }
   });
 
+  const activeModel = "gemini-3.5-flash";
+
   const [analyzingChapterId, setAnalyzingChapterId] = useState<string | null>(null);
 
   // Robust Content Hash-based Stale detection
@@ -125,7 +127,10 @@ export default function StoryFlowTab({
       const response = await fetch("/api/gemini/analyze-story-flow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapters: preparedChapters }),
+        body: JSON.stringify({ 
+          chapters: preparedChapters,
+          model: activeModel 
+        }),
       });
 
       if (!response.ok) {

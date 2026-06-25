@@ -64,6 +64,8 @@ export default function App() {
   const [leftSidebarTab, setLeftSidebarTab] = useState<"structure" | "outline" | "lore">("structure");
   const [rightPanelTab, setRightPanelTab] = useState<AiTab>("refine");
 
+  const selectedModel = "gemini-3.5-flash";
+
   // World Lore Codex state - lazy initialization from LocalStorage
   const [loreBook, setLoreBook] = useState<LoreBookItem[]>(() => {
     try {
@@ -308,6 +310,7 @@ export default function App() {
           content: activeCh.content,
           previousAnalysis: activeCh.analytics || analyticsResult || undefined,
           mode: analysisMode,
+          model: selectedModel,
         }),
       });
 
@@ -469,6 +472,7 @@ export default function App() {
           content: ch.content,
           previousAnalysis: ch.analytics || undefined,
           mode: "progressive",
+          model: selectedModel,
         }),
       });
 
