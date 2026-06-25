@@ -491,6 +491,15 @@ In contrast, **Chapter ${lowestSensory.index} ("${lowestSensory.title}")** regis
     );
   }
 
+  // Suggestion 5: Draft Expansion Tip if chapters are short
+  const shortChaptersList = chapterDetails.filter(c => c.wordCount < 150);
+  if (shortChaptersList.length > 0) {
+    const shortTitles = shortChaptersList.map(c => `"${c.title}"`).join(", ");
+    macroImprovementPlan.push(
+      `💡 Note on Draft Expansion: The drafts for ${shortTitles} are currently very short (under 150 words). To unlock full analytical precision and smooth transitions, consider extending these chapters inside the Writing Canvas by adding more sensory descriptions, character reflections, or active dialogue.`
+    );
+  }
+
   return {
     coherenceScore,
     flowOverview,
@@ -1070,8 +1079,6 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
       return res.status(400).json({ error: "Story chapters list is required to evaluate overall flow." });
     }
 
-    const ai = getGeminiClient();
-
     // Prepare a high-density index summary of each chapter's details for fast evaluation
     const chaptersContext = chapters.map((ch, index) => {
       const summaryContent = ch.content || "";
@@ -1169,6 +1176,9 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
   3. The pacing distribution wave: is the story building continuous healthy writing momentum or stalling out?
   4. The sensory balance: checking if some chapters are loaded with environmental rendering while others feel like a "white room".
   
+  IMPORTANT NOTE ON DRAFT LENGTH: 
+  If any of the chapters are very short (e.g. under 150 words), explicitly call this out in the "flowOverview" or "macroImprovementPlan". Advise the writer on how extending those drafts (e.g., through sensory descriptions, character internal dialogue, or paced actions) will directly solve flow, pacing, and transition issues.
+
   Combine these dimensions and construct a definitive unified story-wide flow directive.
 
   STORY CHAPTERS FOR INVENTORY:
