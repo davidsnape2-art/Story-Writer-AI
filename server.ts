@@ -1257,22 +1257,27 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
       const data = JSON.parse(rawText);
       res.json({
         ...data,
-        updatedChapters: chaptersContext.map(c => ({
-          id: c.id,
-          analytics: {
-            sensory: `Sensory Score: ${c.scores.sensory}%`,
-            sensoryScore: c.scores.sensory,
-            pacing: `Pacing Category: ${c.scores.pacingCategory}`,
-            pacingScore: c.scores.pacing,
-            beta: `Beta Score: ${c.scores.beta}%`,
-            betaScore: c.scores.beta,
-            overallScore: c.scores.overall,
-            pacingCategory: c.scores.pacingCategory,
-            pacingValue: c.scores.pacing,
-            contentHash: c.contentHash,
-            title: c.title,
-          }
-        }))
+        updatedChapters: chaptersContext.map(c => {
+          const origCh = chapters.find((ch: any) => ch.id === c.id);
+          const origAnalytics = origCh?.analytics || {};
+          return {
+            id: c.id,
+            analytics: {
+              ...origAnalytics,
+              sensory: origAnalytics.sensory || `Sensory Score: ${c.scores.sensory}%`,
+              sensoryScore: c.scores.sensory,
+              pacing: origAnalytics.pacing || `Pacing Category: ${c.scores.pacingCategory}`,
+              pacingScore: c.scores.pacing,
+              beta: origAnalytics.beta || `Beta Score: ${c.scores.beta}%`,
+              betaScore: c.scores.beta,
+              overallScore: c.scores.overall,
+              pacingCategory: c.scores.pacingCategory,
+              pacingValue: c.scores.pacing,
+              contentHash: origAnalytics.contentHash || c.contentHash,
+              title: c.title,
+            }
+          };
+        })
       });
     } catch (apiError: any) {
       console.warn("[Gemini API] Macro flow analysis failed. Initiating localized high-availability fallback.");
@@ -1281,22 +1286,27 @@ app.post("/api/gemini/analyze-story-flow", async (req, res) => {
       const localFallback = generateRuleBasedStoryFlow(chapters);
       res.json({
         ...localFallback,
-        updatedChapters: chaptersContext.map(c => ({
-          id: c.id,
-          analytics: {
-            sensory: `Sensory Score: ${c.scores.sensory}%`,
-            sensoryScore: c.scores.sensory,
-            pacing: `Pacing Category: ${c.scores.pacingCategory}`,
-            pacingScore: c.scores.pacing,
-            beta: `Beta Score: ${c.scores.beta}%`,
-            betaScore: c.scores.beta,
-            overallScore: c.scores.overall,
-            pacingCategory: c.scores.pacingCategory,
-            pacingValue: c.scores.pacing,
-            contentHash: c.contentHash,
-            title: c.title,
-          }
-        }))
+        updatedChapters: chaptersContext.map(c => {
+          const origCh = chapters.find((ch: any) => ch.id === c.id);
+          const origAnalytics = origCh?.analytics || {};
+          return {
+            id: c.id,
+            analytics: {
+              ...origAnalytics,
+              sensory: origAnalytics.sensory || `Sensory Score: ${c.scores.sensory}%`,
+              sensoryScore: c.scores.sensory,
+              pacing: origAnalytics.pacing || `Pacing Category: ${c.scores.pacingCategory}`,
+              pacingScore: c.scores.pacing,
+              beta: origAnalytics.beta || `Beta Score: ${c.scores.beta}%`,
+              betaScore: c.scores.beta,
+              overallScore: c.scores.overall,
+              pacingCategory: c.scores.pacingCategory,
+              pacingValue: c.scores.pacing,
+              contentHash: origAnalytics.contentHash || c.contentHash,
+              title: c.title,
+            }
+          };
+        })
       });
     }
   } catch (outerError: any) {

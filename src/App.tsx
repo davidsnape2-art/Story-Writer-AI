@@ -230,6 +230,7 @@ export default function App() {
   // Active Chapter resolution
   const activeChapterId = story.activeChapterId || (story.chapters[0]?.id) || "chapter-1";
   const activeCh = story.chapters.find((c) => c.id === activeChapterId) || story.chapters[0] || { id: "chapter-1", title: "Chapter 1", content: "" };
+  const isDiagnosticStale = !!(analyticsResult && analyticsResult.contentHash !== getContentHash(activeCh.content));
 
   // Sync state stats based directly on the active chapter content
   const wordCount = activeCh.content ? activeCh.content.split(/\s+/).filter(Boolean).length : 0;
@@ -544,7 +545,7 @@ export default function App() {
         };
       });
 
-      if (chapterId === story.activeChapterId) {
+      if (chapterId === activeChapterId) {
         setAnalyticsResult(newAnalyticsResult);
       }
 
@@ -1896,6 +1897,15 @@ export default function App() {
                         </button>
                       </div>
 
+                      {isDiagnosticStale && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[10.5px] leading-relaxed flex items-start gap-2 animate-fade-in shadow-xs">
+                          <span className="shrink-0 mt-0.5">⚠️</span>
+                          <div>
+                            <strong>Outdated Critique:</strong> The manuscript has been edited since this review was generated. Run the analytics again to synchronize your diagnostics.
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-3">
                         {analyticsResult ? (
                           <>
@@ -2084,7 +2094,7 @@ export default function App() {
             <StoryFlowTab
               story={story}
               onSelectChapter={(id) => {
-                setStory(prev => ({ ...prev, activeChapterId: id }));
+                handleSelectChapter(id);
                 setSelectedMainTab("canvas");
               }}
               onRunChapterAnalysis={handleAnalyzeSpecificChapter}
